@@ -6,6 +6,14 @@ A DeepSeek Harness RC8 plugin for dragging files, Finder folders, Office documen
 
 [Editable draw.io source](docs/assets/dsh-dragndrop-architecture.drawio)
 
+## 演示视频 / Demo video
+
+The product clip has to be a real recording of DSH Web (or Desktop) on **macOS Apple Silicon**, after `./install.sh`, with the drop overlay and attachment cards visible.
+
+Cloud Linux cannot make that clip. `install.sh` is Darwin-only. OfficeCLI is darwin-arm64. A Linux host/boot install can list the package in the web boot graph and still never mount the client UI.
+
+Record on a Mac: [docs/demo/RECORDING.md](docs/demo/RECORDING.md). Shot list: [docs/demo/SHOTLIST.md](docs/demo/SHOTLIST.md). Do not embed a Pillow animation or a Linux session that only shows native DSH.
+
 ## What came from Codex
 
 The image-preparation path adapts [OpenAI Codex's open-source prompt-image logic](https://github.com/openai/codex/tree/main/codex-rs/utils/image): side and patch budgets, proportional resizing, source-byte passthrough, GIF normalization, and process caching. We translated it from Rust to TypeScript and integrated it with DSH's native image attachment path.

@@ -1,0 +1,5 @@
+id: dsh-dragndrop-attachments
+entry: src/dsh-dragndrop-attachments.ts
+marker: "[my-plugins/dsh-dragndrop-attachments] loaded"
+kind: client
+profile: web

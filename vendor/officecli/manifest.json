@@ -1,0 +1,13 @@
+{
+  "name": "OfficeCLI",
+  "version": "1.0.144",
+  "sourceCommit": "1ced45e900782c5083ed550ddf328ee974e425e7",
+  "license": "Apache-2.0",
+  "assets": {
+    "darwin-arm64": {
+      "path": "darwin-arm64/officecli",
+      "sha256": "04757163428c5bde8d91e8f838517818e74722157722ca5f3877b6716b77bd45",
+      "upstreamAsset": "officecli-mac-arm64"
+    }
+  }
+}

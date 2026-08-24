@@ -1,0 +1,114 @@
+{
+  "name": "dsh-dragndrop-attachments",
+  "version": "1.2.0",
+  "description": "Local drag-and-drop attachments for DeepSeek Harness, delivered as an external plugin",
+  "type": "module",
+  "main": "lib/dsh-dragndrop-attachments.js",
+  "types": "lib/types/dsh-dragndrop-attachments.d.ts",
+  "scripts": {
+    "build": "node scripts/clean-build.mjs && tsc -p tsconfig.json && node scripts/stage-engine.mjs && tsdown && node scripts/sanitize-build.mjs && node scripts/verify-client-bundle.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "audit:public": "node scripts/audit-public.mjs",
+    "check": "pnpm audit:public && pnpm test && pnpm build",
+    "release": "pnpm audit:public && node scripts/build-release.mjs",
+    "verify:package": "node scripts/verify-package.mjs"
+  },
+  "exports": {
+    ".": { "types": "./lib/types/dsh-dragndrop-attachments.d.ts", "default": "./lib/dsh-dragndrop-attachments.js" },
+    "./client": { "types": "./lib/types/client/index.d.ts", "default": "./lib/client.js" },
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "entry": "./lib/client.js",
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-commands",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
+    }
+  },
+  "files": [
+    "src",
+    "lib",
+    "vendor",
+    "scripts",
+    "tests",
+    "docs",
+    "cordis.yml",
+    "dshx.yml",
+    "tsconfig.json",
+    "tsdown.config.ts",
+    "pnpm-lock.yaml",
+    "install.sh",
+    "LICENSE",
+    "README.md",
+    "USER_GUIDE.zh-CN.md",
+    "THIRD_PARTY_NOTICES.md",
+    "CHANGELOG.md",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md"
+  ],
+  "engines": { "node": "^22.19.0 || >=24.0.0" },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aa2246740/dsh-dragndrop-attachments.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aa2246740/dsh-dragndrop-attachments/issues"
+  },
+  "homepage": "https://github.com/aa2246740/dsh-dragndrop-attachments#readme",
+  "publishConfig": { "access": "public" },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-agent": "^0.1.0-rc.8",
+    "@deepseek-ai/dsh-attachment": "^0.1.0-rc.8",
+    "@deepseek-ai/dsh-client-connection": "^0.1.0-rc.8",
+    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.8",
+    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.0-rc.8",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.8",
+    "@deepseek-ai/dsh-home-paths": "^0.1.0-rc.8",
+    "@deepseek-ai/dsh-subprocess": "^0.1.0-rc.8",
+    "@deepseek-ai/dsh-system-prompt": "^0.1.0-rc.8",
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.8",
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "fast-xml-parser": "^5.3.1",
+    "fflate": "^0.8.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "saxes": "^6.0.0",
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-agent": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-attachment": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-client-connection": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-client-ui-conversation": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-home-paths": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-subprocess": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-system-prompt": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-tools": "0.1.0-rc.8",
+    "@deepseek-ai/schemastery": "3.18.1",
+    "@types/node": "22.20.0",
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "~18.3.0",
+    "fast-xml-parser": "5.3.1",
+    "fflate": "0.8.2",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "saxes": "6.0.0",
+    "sharp": "0.35.3",
+    "tsdown": "0.22.2",
+    "typescript": "6.0.3",
+    "vitest": "4.1.8"
+  }
+}

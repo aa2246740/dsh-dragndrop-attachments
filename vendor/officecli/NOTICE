@@ -1,0 +1,8 @@
+OfficeCLI 1.0.144
+Copyright 2026 OfficeCLI (https://OfficeCLI.AI)
+Source commit: 1ced45e900782c5083ed550ddf328ee974e425e7
+Upstream: https://github.com/iOfficeAI/OfficeCLI
+License: Apache-2.0, reproduced in LICENSE.
+
+The bundled executable is unmodified. DeepSeek Harness invokes it locally
+with automatic updates and automatic dependency installation disabled.

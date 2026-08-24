@@ -1,3 +1,9 @@
+/*
+ * The patch-budget dimension algorithm is adapted from OpenAI Codex:
+ * https://github.com/openai/codex/tree/main/codex-rs/utils/image
+ * Copyright 2025 OpenAI. Licensed under Apache-2.0.
+ * Translated from Rust to TypeScript and modified for the DSH browser image path.
+ */
 const MAX_NATIVE_DIMENSION = 2_000
 const MAX_PATCHES = 2_500
 const PATCH_SIZE = 32

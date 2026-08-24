@@ -1,6 +1,16 @@
 # DSH DragNDrop Attachments
 
-`dsh-dragndrop-attachments` 是 DeepSeek Harness RC8 的进程外插件。它给 DSH 增加接近 Codex/Claude Code 的本地附件体验，同时保持 Harness 仓库源码零改动。
+A DeepSeek Harness RC8 plugin for dragging files, Finder folders, Office documents, and ZIP archives into a session. It indexes them locally, then gives the model tools to retrieve the requested lines, ranges, slides, notes, or archive entries.
+
+![DSH DragNDrop Attachments architecture](docs/assets/dsh-dragndrop-architecture.png)
+
+[Editable draw.io source](docs/assets/dsh-dragndrop-architecture.drawio)
+
+## What came from Codex
+
+The image-preparation path adapts [OpenAI Codex's open-source prompt-image logic](https://github.com/openai/codex/tree/main/codex-rs/utils/image): side and patch budgets, proportional resizing, source-byte passthrough, GIF normalization, and process caching. We translated it from Rust to TypeScript and integrated it with DSH's native image attachment path.
+
+The rest of the pipeline was built for DSH: page-wide drop and paste capture, folder snapshots, loopback chunk transfer, session storage, ZIP and Office indexing, and tools that retrieve only the requested parts.
 
 这是社区项目，与 DeepSeek、OpenAI 或 Anthropic 没有隶属或官方合作关系。
 

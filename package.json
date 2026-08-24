@@ -46,6 +46,8 @@
     "pnpm-lock.yaml",
     "install.sh",
     "LICENSE",
+    "LICENSES",
+    "NOTICE",
     "README.md",
     "USER_GUIDE.zh-CN.md",
     "THIRD_PARTY_NOTICES.md",

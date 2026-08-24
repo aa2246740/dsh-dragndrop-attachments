@@ -1,0 +1,8 @@
+dsh-dragndrop-attachments
+
+Portions of the prompt-image preparation logic are adapted from OpenAI Codex.
+Copyright 2025 OpenAI.
+Licensed under the Apache License, Version 2.0.
+
+The adapted code was translated from Rust to TypeScript and modified for
+DeepSeek Harness, sharp, and the browser image path.

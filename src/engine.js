@@ -1,3 +1,9 @@
+/*
+ * Portions of the prompt-image preparation logic are adapted from OpenAI Codex:
+ * https://github.com/openai/codex/tree/main/codex-rs/utils/image
+ * Copyright 2025 OpenAI. Licensed under Apache-2.0.
+ * Translated from Rust to TypeScript and modified for DeepSeek Harness and sharp.
+ */
 import { dirname, join, parse, posix, resolve, sep } from "node:path";
 import z from "@deepseek-ai/schemastery";
 import { AttachmentError, AttachmentId, AttachmentStore } from "@deepseek-ai/dsh-attachment";

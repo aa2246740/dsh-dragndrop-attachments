@@ -30,10 +30,16 @@ import zipfile
 
 dest = Path(sys.argv[1])
 archive = dest / 'project-archive.zip'
-with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
-    zf.writestr('README.md', '# 项目说明\n\n北京分行得分 91。\n')
-    zf.writestr('src/index.ts', 'export const score = 91\n')
-    zf.writestr('assets/logo.bin', bytes([0, 1, 2, 3]))
+stamp = (2026, 1, 1, 0, 0, 0)
+with zipfile.ZipFile(archive, 'w') as zf:
+    for name, data in (
+        ('README.md', '# 项目说明\n\n北京分行得分 91。\n'),
+        ('src/index.ts', 'export const score = 91\n'),
+        ('assets/logo.bin', bytes([0, 1, 2, 3])),
+    ):
+        info = zipfile.ZipInfo(name, date_time=stamp)
+        info.compress_type = zipfile.ZIP_DEFLATED
+        zf.writestr(info, data)
 print(f'wrote {archive}')
 PY
 

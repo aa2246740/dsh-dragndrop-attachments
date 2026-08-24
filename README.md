@@ -6,6 +6,24 @@ A DeepSeek Harness RC8 plugin for dragging files, Finder folders, Office documen
 
 [Editable draw.io source](docs/assets/dsh-dragndrop-architecture.drawio)
 
+## 演示视频 / Demo video
+
+![Capability demo of drag-and-drop attachments](docs/demo/out/plugin-demo.gif)
+
+This is a **labeled capability demo** built from the real `tests/fixtures` files and the architecture art above. It is not a live DeepSeek Harness screen recording — that UI needs macOS Apple Silicon and a running Host.
+
+It shows page-wide drop (image, Finder folder, DOCX / XLSX / PPTX, ZIP), paste, and on-demand tools (`search_attachment`, `read_spreadsheet_range`, `read_slide`) so the model receives a slice instead of the whole file.
+
+- Shot list and fixture map: [docs/demo/SHOTLIST.md](docs/demo/SHOTLIST.md)
+- X-ready H.264: [docs/demo/out/plugin-demo.mp4](docs/demo/out/plugin-demo.mp4)
+- Assemble (from this repo):
+
+```sh
+cd docs/demo
+./assemble.sh              # capability MP4 + GIF
+./assemble.sh --from-raw   # stitch raw/*.mov|mp4; missing clips dry-run and exit 0
+```
+
 ## What came from Codex
 
 The image-preparation path adapts [OpenAI Codex's open-source prompt-image logic](https://github.com/openai/codex/tree/main/codex-rs/utils/image): side and patch budgets, proportional resizing, source-byte passthrough, GIF normalization, and process caching. We translated it from Rust to TypeScript and integrated it with DSH's native image attachment path.

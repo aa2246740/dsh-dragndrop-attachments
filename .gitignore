@@ -7,3 +7,6 @@ coverage/
 .dshx/
 *.log
 *.tgz
+docs/demo/raw/*
+!docs/demo/raw/.gitkeep
+docs/demo/out/frames/

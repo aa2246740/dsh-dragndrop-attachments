@@ -9,5 +9,6 @@ coverage/
 *.tgz
 docs/demo/raw/*
 !docs/demo/raw/.gitkeep
+docs/demo/fixtures/
 docs/demo/linux/node_modules/
 docs/demo/linux/harness-stub/

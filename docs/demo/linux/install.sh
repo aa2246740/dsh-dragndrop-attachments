@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# Linux equivalent of the macOS install.sh path.
+# Linux host/boot experiment. Not the product install. Not a recording path.
 #
-# Official install.sh exits on non-Darwin. This script:
-# 1. Points DSHX_HARNESS at a stub that supplies externalClientBundle
-# 2. Installs plugin deps and builds host + client bundles
-# 3. Adds the package to the official `dsh` web profile
-# 4. Inserts the host row so client-modules can scan dsh.client
+# Official ./install.sh exits on non-Darwin. This script can build the host
+# bundle and insert a Loader row so `dsh web` lists the package in
+# window.__DSH_BOOT__. On Cloud Linux that is as far as it gets: the client
+# dock, page-wide overlay, and + menu entry do not activate. See proof/.
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -48,26 +47,33 @@ DSHX_HARNESS="$stub" pnpm --dir "$plugin" build
 dsh plugin --profile web add "$plugin"
 
 mkdir -p "$profile_dir"
-if [ ! -f "$patch" ]; then
-  printf '%s\n' '[]' > "$patch"
-fi
-if ! grep -q 'id: dsh-dragndrop-attachments' "$patch"; then
-  python3 - "$patch" <<'PY'
+python3 - "$patch" <<'PY'
 from pathlib import Path
 import sys
 path = Path(sys.argv[1])
-text = path.read_text()
-block = """- insert:
+block = """# Your patch layer for this dsh profile, applied after every bundle layer:
+# a top-level YAML array of loader patch entries (id-targeted config
+# overrides, disables, and insert lists; `!!js` expressions allowed).
+- insert:
     - id: dsh-dragndrop-attachments
       name: dsh-dragndrop-attachments
 """
-if text.strip() in ('', '[]'):
+if not path.exists():
     path.write_text(block)
+    raise SystemExit
+text = path.read_text()
+if 'id: dsh-dragndrop-attachments' in text:
+    raise SystemExit
+stripped = text.strip()
+if stripped in ('', '[]') or stripped.endswith('\n[]') or stripped.splitlines()[-1].strip() == '[]':
+    # Keep header comments, replace a lone empty-array document.
+    comments = [line for line in text.splitlines() if line.startswith('#')]
+    prefix = ('\n'.join(comments) + '\n') if comments else ''
+    path.write_text(prefix + '- insert:\n    - id: dsh-dragndrop-attachments\n      name: dsh-dragndrop-attachments\n')
 else:
-    path.write_text(text.rstrip() + '\n' + block)
+    path.write_text(text.rstrip() + '\n- insert:\n    - id: dsh-dragndrop-attachments\n      name: dsh-dragndrop-attachments\n')
 PY
-fi
 
-printf '%s\n' "INSTALL_OK: dsh-dragndrop-attachments is in the web profile."
-printf '%s\n' "Start with: dsh web --no-open --port $web_port"
-printf '%s\n' "OfficeCLI in this package is darwin-arm64 only. Linux can demo image, text/Markdown, folder, ZIP, and CSV. DOCX/XLSX/PPTX parse will fail until a Linux OfficeCLI exists."
+printf '%s\n' "HOST_BOOT_OK: package is in the web profile. Start: dsh web --no-open --port $web_port"
+printf '%s\n' "CLIENT_UI: do not assume the dock is live. On Cloud Linux it does not activate."
+printf '%s\n' "OfficeCLI is darwin-arm64 only. Product recording is macOS Apple Silicon only."

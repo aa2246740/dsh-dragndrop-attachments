@@ -8,20 +8,17 @@ A DeepSeek Harness RC8 plugin for dragging files, Finder folders, Office documen
 
 ## 演示视频 / Demo video
 
-![Capability demo of drag-and-drop attachments](docs/demo/out/plugin-demo.gif)
+The product demo is a **real screen recording** of dragging fixtures into DeepSeek Harness Web UI (for example `http://127.0.0.1:3080`), not a slide animation.
 
-This is a **labeled capability demo** built from the real `tests/fixtures` files and the architecture art above. It is not a live DeepSeek Harness screen recording — that UI needs macOS Apple Silicon and a running Host.
+`docs/demo/out/plugin-demo.mp4` and `plugin-demo.gif` are **placeholders** until that capture lands. Do not post or merge them as the product demo.
 
-It shows page-wide drop (image, Finder folder, DOCX / XLSX / PPTX, ZIP), paste, and on-demand tools (`search_attachment`, `read_spreadsheet_range`, `read_slide`) so the model receives a slice instead of the whole file.
-
-- Shot list and fixture map: [docs/demo/SHOTLIST.md](docs/demo/SHOTLIST.md)
-- X-ready H.264: [docs/demo/out/plugin-demo.mp4](docs/demo/out/plugin-demo.mp4)
-- Assemble (from this repo):
+- Shot list, fixtures, and clip names: [docs/demo/SHOTLIST.md](docs/demo/SHOTLIST.md)
+- Drop `01-drag-image.mov` … `08-on-demand.mov` (or `.mp4`) into `docs/demo/raw/`, then:
 
 ```sh
 cd docs/demo
-./assemble.sh              # capability MP4 + GIF
-./assemble.sh --from-raw   # stitch raw/*.mov|mp4; missing clips dry-run and exit 0
+./assemble.sh              # stitch raw clips → out/plugin-demo.mp4 + GIF
+./assemble.sh --dry-run    # print FOUND/MISSING; exit 0 if clips are absent
 ```
 
 ## What came from Codex

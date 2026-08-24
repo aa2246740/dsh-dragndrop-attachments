@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Assemble docs/demo/out/plugin-demo.mp4 and plugin-demo.gif.
+# Stitch real DSH Web UI screen recordings into docs/demo/out/plugin-demo.mp4 (+ GIF).
 #
-# Default: labeled capability animation from real fixtures (not a live DSH recording).
-# --from-raw: stitch docs/demo/raw/NN-id.mov|mp4 in shotlist order.
-#             Missing clips → print them, dry-run, exit 0.
-# --dry-run:  print the plan only.
+# Default / --from-raw: stitch docs/demo/raw/NN-id.mov|mp4 in shotlist order.
+# Missing clips → print them, do not encode, exit 0.
+# --dry-run: print the plan only.
+# --placeholder: regenerate the labeled animation (not the product demo).
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -36,20 +36,20 @@ shots=(
   '08-on-demand|On-demand tools|按需搜索 / 区间 / 幻灯片'
 )
 
-mode='capability'
+mode='raw'
 dry_run=0
 for arg in "$@"; do
   case "$arg" in
     --from-raw) mode='raw' ;;
-    --capability) mode='capability' ;;
+    --placeholder|--capability) mode='placeholder' ;;
     --dry-run) dry_run=1 ;;
     -h|--help)
-      sed -n '2,10p' "$0"
+      sed -n '2,9p' "$0"
       exit 0
       ;;
     *)
       echo "unknown argument: $arg" >&2
-      echo "usage: $0 [--capability|--from-raw] [--dry-run]" >&2
+      echo "usage: $0 [--from-raw] [--dry-run]" >&2
       exit 2
       ;;
   esac
@@ -107,19 +107,19 @@ prepare_fixtures() {
   bash "$here/prepare-fixtures.sh"
 }
 
-render_capability() {
+render_placeholder() {
+  echo "PLACEHOLDER  this path is not the product demo. Prefer real raw/ DSH Web UI clips."
   need_ffmpeg
   need_pillow
   prepare_fixtures
-  echo "CAPABILITY_RENDER  labeled animation from fixtures + docs/assets (not a live DSH recording)"
   if [[ "$dry_run" -eq 1 ]]; then
-    echo "DRY_RUN  would write $mp4 and $gif"
+    echo "DRY_RUN  would overwrite $mp4 and $gif with the labeled animation"
     return 0
   fi
   mkdir -p "$out_dir"
   python3 "$here/render-capability-demo.py" --mp4 "$mp4" --gif "$gif"
-  echo "ASSEMBLE_OK  $mp4"
-  echo "ASSEMBLE_OK  $gif"
+  echo "PLACEHOLDER_OK  $mp4"
+  echo "PLACEHOLDER_OK  $gif"
 }
 
 escape_drawtext() {
@@ -135,8 +135,9 @@ stitch_raw() {
     missing=1
   fi
   if [[ "$missing" -eq 1 ]]; then
-    echo "DRY_RUN  raw clips incomplete; not encoding. Drop the MISSING files into $raw_dir and re-run --from-raw."
-    echo "         Capability MP4/GIF: run $0  (no --from-raw)."
+    echo "DRY_RUN  raw clips incomplete; not encoding."
+    echo "         Record DSH Web UI (e.g. http://127.0.0.1:3080), drop the MISSING files into $raw_dir, re-run."
+    echo "         Existing out/plugin-demo.mp4 and .gif are placeholders, not the product demo."
     return 0
   fi
   if [[ "$dry_run" -eq 1 ]]; then
@@ -174,6 +175,6 @@ stitch_raw() {
 }
 
 case "$mode" in
-  capability) render_capability ;;
+  placeholder) render_placeholder ;;
   raw) stitch_raw ;;
 esac

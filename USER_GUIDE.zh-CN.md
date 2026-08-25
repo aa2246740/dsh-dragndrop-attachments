@@ -2,13 +2,13 @@
 
 ## 1. 安装
 
-1. 确认 DSH Web 正在运行。
-2. 解压发布包，进入解压得到的 `package` 目录。
-3. 运行 `./install.sh`。
-4. 看到 `INSTALL_OK` 后刷新一次 DSH 页面。
-5. 输入框保持 DSH 原样；点击原生 `+`，菜单里同时出现原命令和“文件和文件夹”，即安装成功。
+不需要 dshx。默认走官方 `dsh`：
 
-新增客户端入口只要求页面刷新，不要求重启 Host。后续更新已有客户端代码时，由 DSH 的客户端热更新链路接管。
+```sh
+dsh plugin --profile web add github:aa2246740/dsh-dragndrop-attachments
+```
+
+然后重启这个 DSH Host，刷新页面。输入框保持 DSH 原样；点击原生 `+`，菜单里同时出现原命令和“文件和文件夹”，即安装成功。
 
 ## 2. 添加附件
 
@@ -94,9 +94,8 @@ ZIP：
 
 ## 6. 安装排障
 
-- `+` 菜单没有“文件和文件夹”：首次安装后刷新一次页面；确认安装器最后输出 `CLIENT_MANIFEST_PRESENT` 和 `INSTALL_OK`。输入框上方不应再有独立附件按钮。
-- 安装器提示已有其他插件路径：不要覆盖。先确认旧目录是否仍需保留，再人工处理 `my-plugins/dsh-dragndrop-attachments`。
-- `dshx check` 失败：保留完整输出，不要重启 Host；先检查发布包是否完整、Node/pnpm 版本是否符合要求。
+- `+` 菜单没有“文件和文件夹”：确认已 `dsh plugin --profile web add github:aa2246740/dsh-dragndrop-attachments`，然后重启 Host 并刷新页面。输入框上方不应再有独立附件按钮。
+- 提示重复 Loader id：profile 里不要再留一份 `cordis.patch.yml` 的 `dsh-dragndrop-attachments` 行，也不要同时用 bundle 和 patch 挂两份。
 - OfficeCLI 校验失败：不要继续运行未知二进制，重新取得完整发布包并核对 SHA-256。
 
 ## 7. 数据位置

@@ -15,8 +15,14 @@
     "verify:package": "node scripts/verify-package.mjs"
   },
   "exports": {
-    ".": { "types": "./lib/types/dsh-dragndrop-attachments.d.ts", "default": "./lib/dsh-dragndrop-attachments.js" },
-    "./client": { "types": "./lib/types/client/index.d.ts", "default": "./lib/client.js" },
+    ".": {
+      "types": "./lib/types/dsh-dragndrop-attachments.d.ts",
+      "default": "./lib/dsh-dragndrop-attachments.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
     "./package.json": "./package.json"
   },
   "dsh": {
@@ -30,6 +36,9 @@
         "@deepseek-ai/dsh-client-ui-conversation",
         "@deepseek-ai/dsh-client-ui-slots"
       ]
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
     }
   },
   "files": [
@@ -54,9 +63,14 @@
     "CHANGELOG.md",
     "SECURITY.md",
     "CONTRIBUTING.md",
-    "CODE_OF_CONDUCT.md"
+    "CODE_OF_CONDUCT.md",
+    "cordis.patch.yml",
+    "lib/*.js",
+    "lib/*.js.map"
   ],
-  "engines": { "node": "^22.19.0 || >=24.0.0" },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -66,7 +80,9 @@
     "url": "https://github.com/aa2246740/dsh-dragndrop-attachments/issues"
   },
   "homepage": "https://github.com/aa2246740/dsh-dragndrop-attachments#readme",
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
     "@deepseek-ai/dsh-agent": "^0.1.0-rc.8",

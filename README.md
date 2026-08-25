@@ -41,40 +41,34 @@ The rest of the pipeline was built for DSH: page-wide drop and paste capture, fo
 
 默认边界：单文件 50 MiB、每会话 20 个附件、每会话总计 100 MiB。一个文件夹最多 10000 个条目、100 MiB 源文件和 128 MiB 确定性快照。Office 解析另有节点量、输出量和 30 秒超时边界。ZIP 在落盘前检查路径穿越、重复路径、压缩算法、最多 10000 个条目、解压后 256 MiB、单条目压缩比 100；单个可读文本条目上限 8 MiB，一次搜索最多解压 32 MiB 文本。
 
-## 一键安装
+## 安装
 
-要求：macOS Apple Silicon、DeepSeek Harness `0.1.0-rc.8`、已配置 `dshx`、Node.js 22.19+、pnpm，以及正在运行的 Web Host（默认端口 `43127`）。
-
-从 [Releases](https://github.com/aa2246740/dsh-dragndrop-attachments/releases) 下载 `dsh-dragndrop-attachments-1.2.0.tgz`，核对 Release 页面给出的 SHA-256，然后执行：
+不需要 dshx。默认走官方 `dsh`。当前发布面向 macOS Apple Silicon、DeepSeek Harness `0.1.0-rc.8`、Node.js 22.19+。
 
 ```sh
-tar -xzf dsh-dragndrop-attachments-1.2.0.tgz
-cd package
-./install.sh
+dsh plugin --profile web add github:aa2246740/dsh-dragndrop-attachments
 ```
 
-安装器只会：
-
-1. 在 `my-plugins/dsh-dragndrop-attachments` 建立指向外部插件目录的符号链接；
-2. 安装插件自己的依赖并重建插件产物；
-3. 运行 `dshx check`；
-4. 用 `activate-new-client` 把插件挂入当前 Host。
-
-它不会修改 Harness 的 tracked source。首次安装通过外部插件配置热挂载，Host 不重启，刷新一次页面即可载入新的客户端入口；以后只改客户端时由 HMR 接管。升级到包含新 Host 逻辑的版本时，需要集中重启一次 DSH Host 以换入新的插件模块，这不等于修改 Harness 源码。
-
-若 Web 端口不是 43127：
+或本地 clone：
 
 ```sh
-DSH_WEB_PORT=你的端口 ./install.sh
+git clone https://github.com/aa2246740/dsh-dragndrop-attachments.git
+dsh plugin --profile web add ./dsh-dragndrop-attachments
 ```
 
-若 `dshx` 尚未记录 Harness 路径：
+然后**重启这个 DSH Host**，**刷新页面**。`dsh plugin add` 只写 profile，不会热挂正在跑的 Host。
+
+卸载：
 
 ```sh
-DSHX_HARNESS=/绝对路径/deepseek-harness-rc8 ./install.sh
+dsh plugin --profile web remove dsh-dragndrop-attachments
 ```
 
 详细使用和排障见 [USER_GUIDE.zh-CN.md](USER_GUIDE.zh-CN.md)。
+
+## Optional: dshx
+
+已经在用 Agent 对着一份 Harness 检出干活？先装 [dshx](https://github.com/aa2246740/dsh-external-plugin-devkit)，再把那个仓库和本仓库（`https://github.com/aa2246740/dsh-dragndrop-attachments`）一起交给 Agent。后面它自己会装。
 
 ## 本地数据与隐私
 

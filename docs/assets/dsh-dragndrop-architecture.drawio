@@ -43,20 +43,23 @@
         <mxCell id="main-label" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1;fontColor=#1849A9;" value="DSH-DRAGNDROP-ATTACHMENTS" vertex="1">
           <mxGeometry height="24" width="300" x="95" y="355" as="geometry" />
         </mxCell>
-        <mxCell id="capture" parent="1" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#84ADFF;strokeWidth=2;align=left;verticalAlign=top;spacing=20;" value="&lt;div style=&quot;text-align:left;&quot;&gt;&lt;div style=&quot;font-size:12px;color:#2F6BFF;font-weight:700;letter-spacing:1px;&quot;&gt;01&lt;/div&gt;&lt;div style=&quot;font-size:21px;font-weight:700;color:#101828;margin-top:10px;&quot;&gt;Capture&lt;/div&gt;&lt;div style=&quot;font-size:15px;color:#475467;line-height:1.55;margin-top:12px;&quot;&gt;Files, screenshots, ZIP, Office, and whole folders.&lt;/div&gt;&lt;/div&gt;" vertex="1">
-          <mxGeometry height="225" width="240" x="95" y="410" as="geometry" />
+        <mxCell id="capture" parent="1" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#84ADFF;strokeWidth=2;align=left;verticalAlign=top;spacing=18;" value="&lt;div style=&quot;text-align:left;&quot;&gt;&lt;div style=&quot;font-size:12px;color:#2F6BFF;font-weight:700;letter-spacing:1px;&quot;&gt;01&lt;/div&gt;&lt;div style=&quot;font-size:20px;font-weight:700;color:#101828;margin-top:10px;&quot;&gt;Capture&lt;/div&gt;&lt;div style=&quot;font-size:14px;color:#475467;line-height:1.5;margin-top:12px;&quot;&gt;Files, screenshots, ZIP, Office, and whole folders.&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="225" width="210" x="95" y="410" as="geometry" />
         </mxCell>
-        <mxCell id="normalize" parent="1" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#84ADFF;strokeWidth=2;align=left;verticalAlign=top;spacing=20;" value="&lt;div style=&quot;text-align:left;&quot;&gt;&lt;div style=&quot;font-size:12px;color:#2F6BFF;font-weight:700;letter-spacing:1px;&quot;&gt;02&lt;/div&gt;&lt;div style=&quot;font-size:21px;font-weight:700;color:#101828;margin-top:10px;&quot;&gt;Normalize in the browser&lt;/div&gt;&lt;div style=&quot;font-size:15px;color:#475467;line-height:1.55;margin-top:12px;&quot;&gt;Keep relative paths. Prepare large images. Transfer bounded chunks.&lt;/div&gt;&lt;/div&gt;" vertex="1">
-          <mxGeometry height="225" width="240" x="380" y="410" as="geometry" />
+        <mxCell id="normalize" parent="1" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#84ADFF;strokeWidth=2;align=left;verticalAlign=top;spacing=18;" value="&lt;div style=&quot;text-align:left;&quot;&gt;&lt;div style=&quot;font-size:12px;color:#2F6BFF;font-weight:700;letter-spacing:1px;&quot;&gt;02&lt;/div&gt;&lt;div style=&quot;font-size:20px;font-weight:700;color:#101828;margin-top:10px;&quot;&gt;Normalize in the browser&lt;/div&gt;&lt;div style=&quot;font-size:14px;color:#475467;line-height:1.5;margin-top:12px;&quot;&gt;Keep folder-relative paths. Hide absolute paths. Prepare large images.&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="225" width="210" x="329" y="410" as="geometry" />
         </mxCell>
-        <mxCell id="index" parent="1" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#84ADFF;strokeWidth=2;align=left;verticalAlign=top;spacing=20;" value="&lt;div style=&quot;text-align:left;&quot;&gt;&lt;div style=&quot;font-size:12px;color:#2F6BFF;font-weight:700;letter-spacing:1px;&quot;&gt;03&lt;/div&gt;&lt;div style=&quot;font-size:21px;font-weight:700;color:#101828;margin-top:10px;&quot;&gt;Store and index locally&lt;/div&gt;&lt;div style=&quot;font-size:15px;color:#475467;line-height:1.55;margin-top:12px;&quot;&gt;Content hashes. Session refs. Safe ZIP limits. Office parsing.&lt;/div&gt;&lt;/div&gt;" vertex="1">
-          <mxGeometry height="225" width="240" x="665" y="410" as="geometry" />
+        <mxCell id="index" parent="1" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#84ADFF;strokeWidth=2;align=left;verticalAlign=top;spacing=18;" value="&lt;div style=&quot;text-align:left;&quot;&gt;&lt;div style=&quot;font-size:12px;color:#2F6BFF;font-weight:700;letter-spacing:1px;&quot;&gt;03&lt;/div&gt;&lt;div style=&quot;font-size:20px;font-weight:700;color:#101828;margin-top:10px;&quot;&gt;Store and index locally&lt;/div&gt;&lt;div style=&quot;font-size:14px;color:#475467;line-height:1.5;margin-top:12px;&quot;&gt;Content hashes. Safe ZIP limits. Office parsing.&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="225" width="210" x="563" y="410" as="geometry" />
         </mxCell>
-        <mxCell id="tools" parent="1" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#84ADFF;strokeWidth=2;align=left;verticalAlign=top;spacing=20;" value="&lt;div style=&quot;text-align:left;&quot;&gt;&lt;div style=&quot;font-size:12px;color:#2F6BFF;font-weight:700;letter-spacing:1px;&quot;&gt;04&lt;/div&gt;&lt;div style=&quot;font-size:21px;font-weight:700;color:#101828;margin-top:10px;&quot;&gt;Let the agent query&lt;/div&gt;&lt;div style=&quot;font-size:15px;color:#475467;line-height:1.55;margin-top:12px;&quot;&gt;List, search, then read exact lines, cells, slides, notes, or entries.&lt;/div&gt;&lt;/div&gt;" vertex="1">
-          <mxGeometry height="225" width="240" x="950" y="410" as="geometry" />
+        <mxCell id="bind-turn" parent="1" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#84ADFF;strokeWidth=2;align=left;verticalAlign=top;spacing=18;" value="&lt;div style=&quot;text-align:left;&quot;&gt;&lt;div style=&quot;font-size:12px;color:#2F6BFF;font-weight:700;letter-spacing:1px;&quot;&gt;04&lt;/div&gt;&lt;div style=&quot;font-size:20px;font-weight:700;color:#101828;margin-top:10px;&quot;&gt;Bind to this user turn&lt;/div&gt;&lt;div style=&quot;font-size:14px;color:#475467;line-height:1.5;margin-top:12px;&quot;&gt;Attach refs before the model request. Leave a visible receipt.&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="225" width="210" x="797" y="410" as="geometry" />
         </mxCell>
-        <mxCell id="model" parent="1" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#1849A9;strokeColor=#1849A9;strokeWidth=2;align=left;verticalAlign=top;spacing=20;" value="&lt;div style=&quot;text-align:left;&quot;&gt;&lt;div style=&quot;font-size:12px;color:#FFFFFF;font-weight:700;letter-spacing:1px;&quot;&gt;05&lt;/div&gt;&lt;div style=&quot;font-size:21px;font-weight:700;color:#FFFFFF;margin-top:10px;&quot;&gt;Send the slice&lt;/div&gt;&lt;div style=&quot;font-size:15px;color:#D1E0FF;line-height:1.55;margin-top:12px;&quot;&gt;The model gets the requested fragment, not every byte you dropped.&lt;/div&gt;&lt;/div&gt;" vertex="1">
-          <mxGeometry height="225" width="240" x="1235" y="410" as="geometry" />
+        <mxCell id="tools" parent="1" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#84ADFF;strokeWidth=2;align=left;verticalAlign=top;spacing=18;" value="&lt;div style=&quot;text-align:left;&quot;&gt;&lt;div style=&quot;font-size:12px;color:#2F6BFF;font-weight:700;letter-spacing:1px;&quot;&gt;05&lt;/div&gt;&lt;div style=&quot;font-size:20px;font-weight:700;color:#101828;margin-top:10px;&quot;&gt;Read by attachment ID&lt;/div&gt;&lt;div style=&quot;font-size:14px;color:#475467;line-height:1.5;margin-top:12px;&quot;&gt;read_attachment first. Exact slices next. Block filesystem guessing.&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="225" width="210" x="1031" y="410" as="geometry" />
+        </mxCell>
+        <mxCell id="model" parent="1" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#1849A9;strokeColor=#1849A9;strokeWidth=2;align=left;verticalAlign=top;spacing=18;" value="&lt;div style=&quot;text-align:left;&quot;&gt;&lt;div style=&quot;font-size:12px;color:#FFFFFF;font-weight:700;letter-spacing:1px;&quot;&gt;06&lt;/div&gt;&lt;div style=&quot;font-size:20px;font-weight:700;color:#FFFFFF;margin-top:10px;&quot;&gt;Send the slice&lt;/div&gt;&lt;div style=&quot;font-size:14px;color:#D1E0FF;line-height:1.5;margin-top:12px;&quot;&gt;The model gets the requested fragment, not every byte you dropped.&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="225" width="210" x="1265" y="410" as="geometry" />
         </mxCell>
         <mxCell id="main-edge-1" edge="1" parent="1" source="capture" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=4;strokeColor=#2F6BFF;" target="normalize">
           <mxGeometry relative="1" as="geometry" />
@@ -64,10 +67,13 @@
         <mxCell id="main-edge-2" edge="1" parent="1" source="normalize" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=4;strokeColor=#2F6BFF;" target="index">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="main-edge-3" edge="1" parent="1" source="index" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=4;strokeColor=#2F6BFF;" target="tools">
+        <mxCell id="main-edge-3" edge="1" parent="1" source="index" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=4;strokeColor=#2F6BFF;" target="bind-turn">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="main-edge-4" edge="1" parent="1" source="tools" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=4;strokeColor=#2F6BFF;" target="model">
+        <mxCell id="main-edge-4" edge="1" parent="1" source="bind-turn" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=4;strokeColor=#2F6BFF;" target="tools">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="main-edge-5" edge="1" parent="1" source="tools" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=4;strokeColor=#2F6BFF;" target="model">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="pill-1" parent="1" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B2CCFF;fontSize=14;fontStyle=1;fontColor=#1849A9;" value="DeepSeek Harness plugin" vertex="1">
@@ -76,13 +82,13 @@
         <mxCell id="pill-2" parent="1" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B2CCFF;fontSize=14;fontStyle=1;fontColor=#1849A9;" value="Image prep adapted from OpenAI Codex" vertex="1">
           <mxGeometry height="48" width="340" x="365" y="692" as="geometry" />
         </mxCell>
-        <mxCell id="pill-3" parent="1" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B2CCFF;fontSize=14;fontStyle=1;fontColor=#1849A9;" value="Local index, slice-by-slice reads" vertex="1">
+        <mxCell id="pill-3" parent="1" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B2CCFF;fontSize=14;fontStyle=1;fontColor=#1849A9;" value="Path-free, turn-bound context" vertex="1">
           <mxGeometry height="48" width="300" x="725" y="692" as="geometry" />
         </mxCell>
         <mxCell id="repo" parent="1" style="text;html=1;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontColor=#475467;" value="github.com/aa2246740/dsh-dragndrop-attachments" vertex="1">
           <mxGeometry height="48" width="430" x="1045" y="692" as="geometry" />
         </mxCell>
-        <mxCell id="footer" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=17;fontStyle=1;fontColor=#344054;" value="Local files become queryable context, not prompt ballast." vertex="1">
+        <mxCell id="footer" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=17;fontStyle=1;fontColor=#344054;" value="Files stay attached to the message; models read only the needed slice." vertex="1">
           <mxGeometry height="32" width="1460" x="70" y="838" as="geometry" />
         </mxCell>
       </root>

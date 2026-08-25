@@ -21,9 +21,10 @@ import {
   MAX_SESSION_BYTES,
   MAX_SESSION_FILES,
   classifyFile,
+  isPendingAttachment,
   normalizedError,
   sanitizeName,
-  type AttachmentRecord, type FolderAttachmentRecord,
+  type AttachmentBinding, type AttachmentRecord, type FolderAttachmentRecord,
 } from './domain.js'
 
 // Persisted schema tokens predate the public package name and remain stable for data compatibility.
@@ -73,6 +74,11 @@ interface SessionEnvelope {
 
 function sessionKey(sessionId: string): string {
   return createHash('sha256').update(sessionId).digest('hex')
+}
+
+/** One user selection is one attachment, even when its immutable bytes already exist in CAS. */
+function attachmentOccurrenceId(): string {
+  return `attachment:${randomUUID()}`
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -125,6 +131,12 @@ function headingOutline(text: string): readonly Record<string, unknown>[] {
     blocks.push({ id: `lines:${start}-${end}`, title: `第 ${start}-${end} 行`, level: 1, locator: { kind: 'text', line: start } })
   }
   return blocks
+}
+
+function requiredLine(value: number | undefined, fallback: number, field: string): number {
+  const line = value ?? fallback
+  if (!Number.isInteger(line) || line < 1) throw new AttachmentPluginError(`${field} 必须是正整数。`, 'BAD_REQUEST')
+  return line
 }
 
 export interface CatalogOptions {
@@ -214,6 +226,11 @@ export class AttachmentCatalog {
     return (await this.read(sessionId)).attachments
   }
 
+  /** Attachments already admitted into durable conversation history. */
+  async available(sessionId: string): Promise<readonly AttachmentRecord[]> {
+    return (await this.list(sessionId)).filter(record => record.committed)
+  }
+
   async ingest(sessionId: string, rawName: string, data: Uint8Array, signal?: AbortSignal): Promise<AttachmentRecord> {
     signal?.throwIfAborted()
     if (data.byteLength === 0) throw new AttachmentPluginError('附件不能为空。', 'BAD_REQUEST')
@@ -226,18 +243,18 @@ export class AttachmentCatalog {
         const ref = await saveTextFile(this.engineRoot, { data, mediaType: accepted.mediaType, name }, TEXT_LIMITS)
         const text = new TextDecoder('utf-8', { fatal: true }).decode(data)
         record = {
-          schemaVersion: 'dsh-codex-attachment.v1', attachmentId: ref.attachmentId, name,
+          schemaVersion: 'dsh-codex-attachment.v1', attachmentId: attachmentOccurrenceId(), name,
           mediaType: accepted.mediaType, bytes: data.byteLength, kind: 'text', status: 'READY',
           coverage: textCoverage(), warnings: [], preview: textPreview(text), parser: 'utf8-local',
-          createdAt: new Date().toISOString(), ref, committed: false,
+          createdAt: new Date().toISOString(), ref, committed: false, pending: true,
         }
       } else if (accepted.kind === 'document') {
         const ref = await this.documents.save({ data, mediaType: accepted.mediaType, name }, signal)
         record = {
-          schemaVersion: 'dsh-codex-attachment.v1', attachmentId: ref.attachmentId, name,
+          schemaVersion: 'dsh-codex-attachment.v1', attachmentId: attachmentOccurrenceId(), name,
           mediaType: accepted.mediaType, bytes: data.byteLength, kind: 'document', documentKind: ref.documentKind,
           status: ref.status, coverage: ref.coverage, warnings: ref.warnings, preview: ref.preview,
-          parser: `officecli-${OFFICECLI_VERSION}`, createdAt: new Date().toISOString(), ref, committed: false,
+          parser: `officecli-${OFFICECLI_VERSION}`, createdAt: new Date().toISOString(), ref, committed: false, pending: true,
         }
       } else {
         const { ref, manifest } = await this.archives.save(data)
@@ -245,7 +262,7 @@ export class AttachmentCatalog {
         const readable = files.filter(entry => entry.text)
         const binary = files.length - readable.length
         record = {
-          schemaVersion: 'dsh-codex-attachment.v1', attachmentId: `sha256:${ref.sha256}`, name,
+          schemaVersion: 'dsh-codex-attachment.v1', attachmentId: attachmentOccurrenceId(), name,
           mediaType: 'application/zip', bytes: data.byteLength, kind: 'archive', documentKind: 'archive', status: 'READY',
           coverage: {
             status: binary === 0 ? 'COMPLETE' : 'PARTIAL',
@@ -255,15 +272,13 @@ export class AttachmentCatalog {
           },
           warnings: binary === 0 ? [] : [{ code: 'ARCHIVE_BINARY_ENTRIES', message: `${binary} 个二进制条目只列目录，不注入正文。` }],
           preview: [`ZIP · ${files.length} files · ${manifest.entries.length - files.length} folders`, ...files.slice(0, 30).map(entry => entry.path)].join('\n'),
-          parser: 'zip-local-fflate-0.8.2', createdAt: new Date().toISOString(), ref, committed: false,
+          parser: 'zip-local-fflate-0.8.2', createdAt: new Date().toISOString(), ref, committed: false, pending: true,
         }
       }
-      return await this.mutate(sessionId, async current => {
-        const same = current.attachments.find(entry => entry.attachmentId === record.attachmentId)
-        if (same !== undefined) return { next: current, value: same }
+      return await this.mutate<AttachmentRecord>(sessionId, async current => {
         if (current.attachments.length >= MAX_SESSION_FILES) throw new AttachmentPluginError('会话附件数量已达上限。', 'TOO_MANY_ATTACHMENTS')
         const total = current.attachments.reduce((sum, entry) => sum + entry.bytes, 0) + record.bytes
-        if (total > MAX_SESSION_BYTES) throw new AttachmentPluginError('会话附件总量超过 100 MiB。', 'ATTACHMENTS_TOO_LARGE')
+        if (total > MAX_SESSION_BYTES) throw new AttachmentPluginError('会话附件总量超过 1 GiB。', 'ATTACHMENTS_TOO_LARGE')
         return { next: { ...current, attachments: [...current.attachments, record] }, value: record }
       })
     } catch (error) {
@@ -291,9 +306,8 @@ export class AttachmentCatalog {
         throw new AttachmentPluginError('文件夹快照目录与声明不一致。', 'ARCHIVE_CORRUPT')
       }
       const binary = files.filter(entry => !entry.text).length
-      const attachmentId = `sha256:${createHash('sha256').update(name).update('\0').update(ref.sha256).digest('hex')}`
       const record: FolderAttachmentRecord = {
-        schemaVersion: 'dsh-codex-attachment.v1', attachmentId, name,
+        schemaVersion: 'dsh-codex-attachment.v1', attachmentId: attachmentOccurrenceId(), name,
         mediaType: 'application/vnd.dsh.folder-snapshot+zip', bytes: source.sourceBytes,
         sourceBytes: source.sourceBytes, fileCount: files.length, directoryCount: directories.length,
         kind: 'folder', documentKind: 'folder', status: 'READY',
@@ -305,14 +319,12 @@ export class AttachmentCatalog {
         },
         warnings: binary === 0 ? [] : [{ code: 'FOLDER_BINARY_ENTRIES', message: `${binary} 个二进制条目只列目录，不注入正文。` }],
         preview: [`文件夹 · ${files.length} files · ${directories.length} folders`, ...manifest.entries.slice(0, 30).map(entry => entry.path)].join('\n'),
-        parser: 'folder-snapshot-fflate-0.8.2', createdAt: new Date().toISOString(), ref, committed: false,
+        parser: 'folder-snapshot-fflate-0.8.2', createdAt: new Date().toISOString(), ref, committed: false, pending: true,
       }
-      return await this.mutate(sessionId, async current => {
-        const same = current.attachments.find(entry => entry.attachmentId === record.attachmentId)
-        if (same !== undefined) return { next: current, value: same as FolderAttachmentRecord }
+      return await this.mutate<FolderAttachmentRecord>(sessionId, async current => {
         if (current.attachments.length >= MAX_SESSION_FILES) throw new AttachmentPluginError('会话附件数量已达上限。', 'TOO_MANY_ATTACHMENTS')
         const total = current.attachments.reduce((sum, entry) => sum + entry.bytes, 0) + record.bytes
-        if (total > MAX_SESSION_BYTES) throw new AttachmentPluginError('会话附件总量超过 100 MiB。', 'ATTACHMENTS_TOO_LARGE')
+        if (total > MAX_SESSION_BYTES) throw new AttachmentPluginError('会话附件总量超过 1 GiB。', 'ATTACHMENTS_TOO_LARGE')
         return { next: { ...current, attachments: [...current.attachments, record] }, value: record }
       })
     } catch (error) {
@@ -322,22 +334,46 @@ export class AttachmentCatalog {
 
   async commitReferences(sessionId: string, attachmentIds: readonly string[]): Promise<void> {
     const wanted = new Set(attachmentIds)
-    await this.mutate(sessionId, async current => ({
-      next: { ...current, attachments: current.attachments.map(record => wanted.has(record.attachmentId) ? { ...record, committed: true } : record) },
-      value: undefined,
-    }))
+    const records = await this.list(sessionId)
+    if ([...wanted].some(id => !records.some(record => record.attachmentId === id))) {
+      throw new AttachmentPluginError('待提交附件已不存在。', 'ATTACHMENT_NOT_FOUND')
+    }
+  }
+
+  /**
+   * Atomically consume every composer attachment for one accepted user message.
+   * This server-side boundary is authoritative; the browser cannot race the
+   * first model request by committing references after submit has started.
+   */
+  async bindPending(sessionId: string, binding: Omit<AttachmentBinding, 'boundAt'>): Promise<readonly AttachmentRecord[]> {
+    return this.mutate(sessionId, async current => {
+      const boundAt = new Date().toISOString()
+      const selected = current.attachments.filter(isPendingAttachment)
+      if (selected.length === 0) return { next: current, value: [] }
+      const wanted = new Set(selected.map(record => record.attachmentId))
+      const attachments = current.attachments.map(record => wanted.has(record.attachmentId)
+        ? { ...record, committed: true, pending: false, binding: { ...binding, boundAt } }
+        : record)
+      return {
+        next: { ...current, attachments },
+        value: attachments.filter(record => wanted.has(record.attachmentId)),
+      }
+    })
   }
 
   async removeDraft(sessionId: string, attachmentId: string): Promise<boolean> {
     return this.mutate(sessionId, async current => {
       const target = current.attachments.find(entry => entry.attachmentId === attachmentId)
-      if (target === undefined || target.committed) return { next: current, value: false }
-      return { next: { ...current, attachments: current.attachments.filter(entry => entry !== target) }, value: true }
+      if (target === undefined || !isPendingAttachment(target)) return { next: current, value: false }
+      const attachments = target.committed
+        ? current.attachments.map(entry => entry === target ? { ...entry, pending: false } : entry)
+        : current.attachments.filter(entry => entry !== target)
+      return { next: { ...current, attachments }, value: true }
     })
   }
 
   async resolve(sessionId: string, attachmentId: string): Promise<AttachmentRecord> {
-    const record = (await this.list(sessionId)).find(entry => entry.attachmentId === attachmentId)
+    const record = (await this.available(sessionId)).find(entry => entry.attachmentId === attachmentId)
     if (record === undefined) throw new AttachmentPluginError('当前会话没有这个附件。', 'ATTACHMENT_NOT_FOUND')
     return record
   }
@@ -348,18 +384,47 @@ export class AttachmentCatalog {
     return new TextDecoder('utf-8', { fatal: true }).decode(stored.data)
   }
 
+  /** Codex-style bounded text read that never requires an opaque block id. */
+  async readTextRange(
+    record: AttachmentRecord,
+    lineStart?: number,
+    lineEnd?: number,
+    signal?: AbortSignal,
+  ): Promise<Record<string, unknown>> {
+    if (record.kind !== 'text') throw new AttachmentPluginError('该读取方式只适用于文本附件。', 'BAD_REQUEST')
+    const start = requiredLine(lineStart, 1, 'line_start')
+    const requestedEnd = requiredLine(lineEnd, start + 399, 'line_end')
+    if (requestedEnd < start) throw new AttachmentPluginError('line_end 不能小于 line_start。', 'BAD_REQUEST')
+    const lines = (await this.readText(record, signal)).split(/\r?\n/u)
+    if (start > lines.length) throw new AttachmentPluginError(`line_start 超出附件范围；该附件共 ${lines.length} 行。`, 'BAD_REQUEST')
+    const end = Math.min(requestedEnd, start + 399, lines.length)
+    return {
+      attachmentId: record.attachmentId,
+      name: record.name,
+      documentKind: 'text',
+      queryKind: 'text-range',
+      text: lines.slice(start - 1, end).join('\n'),
+      locator: { kind: 'text', lineStart: start, lineEnd: end },
+      totalLines: lines.length,
+      truncated: end < lines.length,
+      ...(end < lines.length ? { nextLineStart: end + 1 } : {}),
+      coverage: record.coverage,
+      warnings: record.warnings,
+    }
+  }
+
   async outline(record: AttachmentRecord, signal?: AbortSignal): Promise<Record<string, unknown>> {
     if (record.kind === 'folder') return this.folderize(record, await this.archives.outline(record.ref, signal))
-    if (record.kind === 'archive') return this.archives.outline(record.ref, signal)
-    if (record.kind === 'document') return this.documents.query(record.ref as EngineDocumentRef, { kind: 'outline' }, signal)
+    if (record.kind === 'archive') return this.identify(record, await this.archives.outline(record.ref, signal))
+    if (record.kind === 'document') return this.identify(record, await this.documents.query(record.ref as EngineDocumentRef, { kind: 'outline' }, signal))
     const text = await this.readText(record, signal)
     return { attachmentId: record.attachmentId, name: record.name, documentKind: 'text', queryKind: 'outline', items: headingOutline(text), coverage: record.coverage, warnings: record.warnings }
   }
 
   async search(record: AttachmentRecord, query: string, limit: number, signal?: AbortSignal): Promise<Record<string, unknown>> {
     if (record.kind === 'folder') return this.folderize(record, await this.archives.search(record.ref, query, limit, signal))
-    if (record.kind === 'archive') return this.archives.search(record.ref, query, limit, signal)
-    if (record.kind === 'document') return this.documents.query(record.ref as EngineDocumentRef, { kind: 'search', query, limit }, signal)
+    if (record.kind === 'archive') return this.identify(record, await this.archives.search(record.ref, query, limit, signal))
+    if (record.kind === 'document') return this.identify(record, await this.documents.query(record.ref as EngineDocumentRef, { kind: 'search', query, limit }, signal))
     const needle = query.trim().toLocaleLowerCase()
     if (needle === '') throw new AttachmentPluginError('搜索词不能为空。', 'BAD_REQUEST')
     const lines = (await this.readText(record, signal)).split(/\r?\n/u)
@@ -372,7 +437,7 @@ export class AttachmentCatalog {
   async blocks(record: AttachmentRecord, blockIds: readonly string[], signal?: AbortSignal): Promise<Record<string, unknown>> {
     if (record.kind === 'folder') throw new AttachmentPluginError('文件夹条目请使用 read_folder_entry 或 query_folder_document。', 'BAD_REQUEST')
     if (record.kind === 'archive') throw new AttachmentPluginError('ZIP 条目请使用 read_archive_entry 按路径读取。', 'BAD_REQUEST')
-    if (record.kind === 'document') return this.documents.query(record.ref as EngineDocumentRef, { kind: 'blocks', blockIds }, signal)
+    if (record.kind === 'document') return this.identify(record, await this.documents.query(record.ref as EngineDocumentRef, { kind: 'blocks', blockIds }, signal))
     const lines = (await this.readText(record, signal)).split(/\r?\n/u)
     let budget = 2_000
     const items = blockIds.map((id) => {
@@ -389,14 +454,14 @@ export class AttachmentCatalog {
 
   async documentQuery(record: AttachmentRecord, query: EngineDocumentQuery, signal?: AbortSignal): Promise<Record<string, unknown>> {
     if (record.kind !== 'document') throw new AttachmentPluginError('该读取方式只适用于 Office 或 CSV 附件。', 'BAD_REQUEST')
-    return this.documents.query(record.ref as EngineDocumentRef, query, signal)
+    return this.identify(record, await this.documents.query(record.ref as EngineDocumentRef, query, signal))
   }
 
   async readArchiveEntry(
     record: AttachmentRecord, path: string, lineStart?: number, lineEnd?: number, signal?: AbortSignal,
   ): Promise<Record<string, unknown>> {
     if (record.kind !== 'archive') throw new AttachmentPluginError('该读取方式只适用于 ZIP 附件。', 'BAD_REQUEST')
-    return this.archives.readEntry(record.ref, path, lineStart, lineEnd, signal)
+    return this.identify(record, await this.archives.readEntry(record.ref, path, lineStart, lineEnd, signal))
   }
 
   async readFolderEntry(
@@ -432,5 +497,9 @@ export class AttachmentCatalog {
       ...(items === undefined ? {} : { items }),
       locator: { kind: 'folder', path: entryPath ?? (typeof value.path === 'string' ? value.path : undefined) },
     }
+  }
+
+  private identify(record: AttachmentRecord, value: Record<string, unknown>): Record<string, unknown> {
+    return { ...value, attachmentId: record.attachmentId, name: record.name }
   }
 }

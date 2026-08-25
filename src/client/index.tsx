@@ -4,7 +4,7 @@ import type {} from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { AttachmentRecord } from '../domain.js'
-import { ATTACHMENT_RPC_CHANNEL, ENDPOINTS, isRecord, type RpcResult } from '../wire.js'
+import { ATTACHMENT_RPC_CHANNEL, ENDPOINTS, hasCurrentRpcProtocol, isRecord, type RpcResult } from '../wire.js'
 import { AttachmentDock, type AttachmentDockInjected, type ClientUploadSource } from './AttachmentDock.js'
 import { prepareImage } from './image.js'
 
@@ -130,7 +130,9 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
     name: 'conversation.input.dock', id: 'dsh-dragndrop-attachments', order: -20, priority: 80,
     inject: (sessionId: SessionId): AttachmentDockInjected => {
-      const call = async (endpoint: string, payload: Record<string, unknown>): Promise<unknown> => {
+      let protocolReady = false
+      let protocolProbe: Promise<void> | undefined
+      const rawCall = async (endpoint: string, payload: Record<string, unknown>): Promise<unknown> => {
         const connection = rpcConnection(ctx.get('connection'))
         const result = await connection.rpc.call(ATTACHMENT_RPC_CHANNEL, endpoint, { sessionId, ...payload })
         if (!result.ok) {
@@ -139,12 +141,26 @@ export function apply(ctx: ClientContext): void {
         }
         return result.value
       }
+      const readList = async (): Promise<readonly AttachmentRecord[]> => {
+        const value = await rawCall(ENDPOINTS.list, {})
+        if (!hasCurrentRpcProtocol(value)) {
+          throw new Error('附件插件网页端与服务端版本不一致。附件没有上传或丢失；请重新打开 DSH 完成插件更新。')
+        }
+        if (!Array.isArray(value.attachments)) throw new Error('附件清单响应无效。')
+        protocolReady = true
+        return value.attachments.map(parseRecord)
+      }
+      const ensureProtocol = async (): Promise<void> => {
+        if (protocolReady) return
+        protocolProbe ??= readList().then(() => {})
+        try { await protocolProbe } finally { if (!protocolReady) protocolProbe = undefined }
+      }
+      const call = async (endpoint: string, payload: Record<string, unknown>): Promise<unknown> => {
+        await ensureProtocol()
+        return rawCall(endpoint, payload)
+      }
       return {
-        list: async () => {
-          const value = await call(ENDPOINTS.list, {})
-          if (!isRecord(value) || !Array.isArray(value.attachments)) throw new Error('附件清单响应无效。')
-          return value.attachments.map(parseRecord)
-        },
+        list: readList,
         upload: async (source: ClientUploadSource, progress) => {
           const file = source.kind === 'file' ? source.file : undefined
           const bytes = source.kind === 'file' ? undefined : source.snapshot

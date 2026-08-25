@@ -1,6 +1,8 @@
 import type { AttachmentRecord } from './domain.js'
 
 export const ATTACHMENT_RPC_CHANNEL = '/dsh-dragndrop-attachments'
+/** Bump whenever a mixed client/server pair could silently lose attachment state. */
+export const RPC_PROTOCOL_VERSION = 2 as const
 export const ENDPOINTS = {
   list: 'attachments/list',
   remove: 'attachments/remove',
@@ -18,10 +20,17 @@ export interface RpcFailure {
   readonly error: { readonly code: string; readonly message: string; readonly details?: Record<string, unknown>; readonly action?: string }
 }
 export type RpcResult<T> = RpcSuccess<T> | RpcFailure
-export interface AttachmentListValue { readonly attachments: readonly AttachmentRecord[] }
+export interface AttachmentListValue {
+  readonly protocolVersion: typeof RPC_PROTOCOL_VERSION
+  readonly attachments: readonly AttachmentRecord[]
+}
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+export function hasCurrentRpcProtocol(value: unknown): value is Record<string, unknown> & { readonly protocolVersion: typeof RPC_PROTOCOL_VERSION } {
+  return isRecord(value) && value.protocolVersion === RPC_PROTOCOL_VERSION
 }
 
 export function requiredString(value: unknown, field: string): string {

@@ -22,18 +22,49 @@ describe('common attachment walking skeleton', () => {
     const first = await AttachmentCatalog.open(testContext(), { root: dataRoot })
     const text = '# 经营制度\n\n北京分行得分 83。\n\n## 口径\n只使用已保存数据。\n'
     const record = await first.ingest('session-a', '制度说明.md', new TextEncoder().encode(text))
-    expect(record).toMatchObject({ name: '制度说明.md', kind: 'text', status: 'READY', committed: false })
+    expect(record).toMatchObject({ name: '制度说明.md', kind: 'text', status: 'READY', committed: false, pending: true })
     expect(await first.list('session-b')).toEqual([])
-    await first.commitReferences('session-a', [record.attachmentId])
+    expect(await first.available('session-a')).toEqual([])
+    await first.bindPending('session-a', { messageId: 'message-1', turn: 1, step: 1 })
 
     const reopened = await AttachmentCatalog.open(testContext(), { root: dataRoot })
-    expect(await reopened.list('session-a')).toEqual([expect.objectContaining({ attachmentId: record.attachmentId, committed: true })])
+    expect(await reopened.list('session-a')).toEqual([expect.objectContaining({
+      attachmentId: record.attachmentId,
+      committed: true,
+      pending: false,
+      binding: expect.objectContaining({ messageId: 'message-1', turn: 1, step: 1 }),
+    })])
     const outline = await reopened.outline(await reopened.resolve('session-a', record.attachmentId))
     expect(JSON.stringify(outline)).toContain('经营制度')
     const search = await reopened.search(record, '北京分行', 10)
     expect(JSON.stringify(search)).toContain('lines:3-3')
     const blocks = await reopened.blocks(record, ['lines:1-3'])
     expect(JSON.stringify(blocks)).toContain('北京分行得分 83')
+  })
+
+  it('keeps every file selection distinct while reusing identical CAS bytes', async () => {
+    const catalog = await AttachmentCatalog.open(testContext(), { root: await root() })
+    const bytes = new TextEncoder().encode('# 同一文件\n')
+    const first = await catalog.ingest('repeat-session', 'first-name.md', bytes)
+    const renamed = await catalog.ingest('repeat-session', 'renamed.md', bytes)
+    const sameName = await catalog.ingest('repeat-session', 'first-name.md', bytes)
+
+    expect(new Set([first.attachmentId, renamed.attachmentId, sameName.attachmentId]).size).toBe(3)
+    expect((renamed.ref as { readonly attachmentId?: string }).attachmentId)
+      .toBe((first.ref as { readonly attachmentId?: string }).attachmentId)
+    expect(await catalog.list('repeat-session')).toEqual([
+      expect.objectContaining({ attachmentId: first.attachmentId, name: 'first-name.md', pending: true }),
+      expect.objectContaining({ attachmentId: renamed.attachmentId, name: 'renamed.md', pending: true }),
+      expect.objectContaining({ attachmentId: sameName.attachmentId, name: 'first-name.md', pending: true }),
+    ])
+
+    const bound = await catalog.bindPending('repeat-session', { messageId: 'message-1', turn: 1, step: 1 })
+    expect(bound).toHaveLength(3)
+    const later = await catalog.ingest('repeat-session', 'later.md', bytes)
+    expect(later.attachmentId).not.toBe(first.attachmentId)
+    expect(await catalog.available('repeat-session')).toHaveLength(3)
+    expect(await catalog.removeDraft('repeat-session', later.attachmentId)).toBe(true)
+    expect(await catalog.list('repeat-session')).toHaveLength(3)
   })
 
   it('receives sequential Base64 chunks and commits through the same durable path', async () => {
@@ -61,6 +92,9 @@ describe('common attachment walking skeleton', () => {
     expect(source).not.toContain('appendMarker')
     expect(source).not.toContain('removeMarker')
     expect(source).not.toContain('📎')
+    expect(source).not.toContain('submittingIds')
+    expect(source).not.toContain('committed: true, pending: false')
+    expect(source).toContain('void refresh()')
   })
 
   it('registers a native file-or-folder menu without a Dock chooser and keeps client artifacts marker-free', async () => {
@@ -101,12 +135,13 @@ describe('common attachment walking skeleton', () => {
     })
     const record = await first.ingest('session-zip', 'project.zip', archive)
     expect(record).toMatchObject({ kind: 'archive', documentKind: 'archive', status: 'READY', committed: false })
+    expect(await first.outline(record)).toMatchObject({ attachmentId: record.attachmentId, name: 'project.zip' })
     expect(JSON.stringify(await first.outline(record))).toContain('src/index.ts')
     expect(JSON.stringify(await first.search(record, '北京分行', 10))).toContain('README.md')
     expect(await first.readArchiveEntry(record, 'README.md', 1, 3)).toMatchObject({
       documentKind: 'archive', path: 'README.md', text: expect.stringContaining('北京分行得分 91'),
     })
-    await first.commitReferences('session-zip', [record.attachmentId])
+    await first.bindPending('session-zip', { messageId: 'message-zip', turn: 1, step: 1 })
     const reopened = await AttachmentCatalog.open(testContext(), { root: dataRoot })
     expect(await reopened.readArchiveEntry(await reopened.resolve('session-zip', record.attachmentId), 'src/index.ts'))
       .toMatchObject({ text: expect.stringContaining('score = 91') })
@@ -148,7 +183,7 @@ describe('common attachment walking skeleton', () => {
     expect(JSON.stringify(await first.outline(folder))).toContain('"kind":"folder"')
     expect(JSON.stringify(await first.search(folder, '北京分行', 10))).toContain('docs/README.md')
     expect(await first.readFolderEntry(folder, 'docs/README.md', 1, 3)).toMatchObject({ documentKind: 'folder', path: 'docs/README.md' })
-    await first.commitReferences('folder-session', [folder.attachmentId])
+    await first.bindPending('folder-session', { messageId: 'message-folder', turn: 1, step: 1 })
     const reopened = await AttachmentCatalog.open(testContext(), { root: dataRoot })
     expect(await reopened.readFolderEntry(await reopened.resolve('folder-session', folder.attachmentId), 'docs/README.md')).toMatchObject({ documentKind: 'folder' })
   })
@@ -243,6 +278,21 @@ describe('common attachment walking skeleton', () => {
     await expect(collectDroppedItems(snapshot)).resolves.toEqual([
       expect.objectContaining({ kind: 'file', file: note }),
     ])
+  })
+
+  it('recovers the complete Finder multi-file selection when item handles resolve only partially', async () => {
+    const video = new File(['# 视频\n不同正文'], '视频生成式能力演进时间轴-主流精简版.md', { type: 'text/markdown' })
+    const audio = new File(['# 音频\n另一份正文'], '音频生成式能力演进时间轴.md', { type: 'text/markdown' })
+    const transfer = {
+      items: [
+        { getAsFileSystemHandle: () => Promise.resolve({ kind: 'file', name: video.name, getFile: async () => video }), getAsFile: () => video },
+        { getAsFileSystemHandle: () => Promise.resolve(undefined), getAsFile: () => null },
+      ],
+      files: [video, audio],
+    } as unknown as DataTransfer
+
+    const items = await collectDroppedItems(snapshotDroppedItems(transfer))
+    expect(items.map(item => item.kind === 'file' ? item.file.name : item.name)).toEqual([video.name, audio.name])
   })
 
   it('serializes asynchronous drop intake and reports no concurrent item work', async () => {

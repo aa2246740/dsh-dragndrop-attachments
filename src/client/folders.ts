@@ -232,6 +232,12 @@ export async function collectDroppedItems(snapshot: { readonly items: readonly D
   if (snapshot.items.length > 0) {
     const values = await Promise.all(snapshot.items.map(itemFromSnapshot))
     const items = values.filter((value): value is IntakeItem => value !== undefined)
+    const hasFolder = items.some(item => item.kind === 'folder')
+    const fileCount = items.filter(item => item.kind === 'file').length
+    // Finder may expose a valid handle for only part of a multi-selection. For a
+    // plain-file drop, the complete FileList is authoritative and must win over
+    // a partially resolved DataTransferItemList.
+    if (!hasFolder && snapshot.files.length > fileCount) return entryFromRelativeFiles(snapshot.files)
     if (items.length > 0) return items
   }
   return entryFromRelativeFiles(snapshot.files)

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DraftAttachmentId } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { AttachmentRecord } from '../domain.js'
+import { isPendingAttachment, type AttachmentRecord } from '../domain.js'
 import { collectPickedDirectory, collectWebkitDirectory, encodeFolderSnapshot, supportsModernDirectoryPicker, type IntakeItem } from './folders.js'
 import { isImageFile } from './image.js'
 import { bindFileIntake } from './transfers.js'
@@ -10,7 +10,8 @@ import css from './AttachmentDock.module.css'
 const ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.markdown,.csv,.docx,.xlsx,.pptx,.zip,.json,.jsonl,.yaml,.yml,.toml,.xml,.tsv,.py,.js,.jsx,.ts,.tsx,.css,.html,.sh,.sql,.log'
 const SUPPORTED = /\.(png|jpe?g|webp|gif|txt|md|markdown|csv|docx|xlsx|pptx|zip|json|jsonl|ndjson|ya?ml|toml|xml|tsv|py|jsx?|tsx?|css|html?|sh|zsh|sql|log|ini|conf|env|properties|java|go|rs|c|h|cpp|hpp)$/iu
 
-interface UploadProgress { readonly name: string; readonly percent: number; readonly phase: string }
+interface UploadProgress { readonly id: number; readonly name: string; readonly percent: number; readonly phase: string }
+let nextUploadId = 0
 export type ClientUploadSource =
   | { readonly kind: 'file'; readonly file: File }
   | { readonly kind: 'folder'; readonly name: string; readonly snapshot: Uint8Array; readonly sourceBytes: number; readonly fileCount: number; readonly directoryCount: number }
@@ -38,12 +39,17 @@ function fileBadge(record: AttachmentRecord): string {
   return extension === undefined ? 'FILE' : extension.slice(0, 4)
 }
 
-export function AttachmentDock({ useInput, inputActions, list, upload, removeDraft, commitReferences, registerPicker, attachNativeImages }: AttachmentDockProps) {
+export function AttachmentDock({ useSession, useInput, inputActions, list, upload, removeDraft, commitReferences, registerPicker, attachNativeImages }: AttachmentDockProps) {
   const phase = useInput(state => state.phase)
+  const latestUserSeq = useSession(snapshot => snapshot.nodes.reduce(
+    (latest, node) => node.kind === 'user' ? Math.max(latest, node.seq) : latest,
+    0,
+  ))
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
   const handleItemsRef = useRef<(items: readonly IntakeItem[]) => Promise<void>>(() => Promise.resolve())
-  const committedKey = useRef('')
+  const previousPhase = useRef(phase)
+  const latestUserSeqRef = useRef(latestUserSeq)
   const [records, setRecords] = useState<readonly AttachmentRecord[]>([])
   const [uploads, setUploads] = useState<readonly UploadProgress[]>([])
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -51,7 +57,7 @@ export function AttachmentDock({ useInput, inputActions, list, upload, removeDra
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const reportError = useCallback((value: unknown): void => { setError(value instanceof Error ? value.message : String(value)) }, [])
-  const pending = useMemo(() => records.filter(record => !record.committed), [records])
+  const pending = useMemo(() => records.filter(isPendingAttachment), [records])
   const pendingIds = useMemo(() => pending.map(record => record.attachmentId), [pending])
 
   const openInput = useCallback(async (input: HTMLInputElement | null): Promise<void> => {
@@ -89,27 +95,31 @@ export function AttachmentDock({ useInput, inputActions, list, upload, removeDra
   const refresh = useCallback(async (): Promise<void> => { setRecords(await list()) }, [list])
   useEffect(() => { void refresh().catch(value => { setError(value instanceof Error ? value.message : String(value)) }) }, [refresh])
   useEffect(() => {
-    if (phase !== 'submitting' || pendingIds.length === 0) return
-    const key = [...pendingIds].sort().join('|')
-    if (key === committedKey.current) return
-    committedKey.current = key
-    void commitReferences(pendingIds).then(() => {
-      const committed = new Set(pendingIds)
-      setRecords(current => current.map(record => committed.has(record.attachmentId) ? { ...record, committed: true } : record))
-    }).catch(value => { setError(value instanceof Error ? value.message : String(value)) })
+    const enteringSubmit = phase === 'submitting' && previousPhase.current !== 'submitting'
+    previousPhase.current = phase
+    if (!enteringSubmit || pendingIds.length === 0) return
+    void commitReferences(pendingIds).catch(value => { setError(value instanceof Error ? value.message : String(value)) })
   }, [commitReferences, pendingIds, phase])
+  useEffect(() => {
+    if (latestUserSeq <= latestUserSeqRef.current) return
+    latestUserSeqRef.current = latestUserSeq
+    void refresh().catch(value => { setError(value instanceof Error ? value.message : String(value)) })
+  }, [latestUserSeq, refresh])
 
-  const updateUpload = useCallback((name: string, percent: number, uploadPhase: string): void => {
-    setUploads(current => [...current.filter(item => item.name !== name), { name, percent, phase: uploadPhase }])
+  const updateUpload = useCallback((id: number, name: string, percent: number, uploadPhase: string): void => {
+    setUploads(current => [...current.filter(item => item.id !== id), { id, name, percent, phase: uploadPhase }])
   }, [])
   const appendRecord = useCallback((record: AttachmentRecord): void => {
-    setRecords(current => current.some(entry => entry.attachmentId === record.attachmentId) ? current : [...current, record])
+    setRecords(current => current.some(entry => entry.attachmentId === record.attachmentId)
+      ? current.map(entry => entry.attachmentId === record.attachmentId ? record : entry)
+      : [...current, record])
   }, [])
   const uploadOne = useCallback(async (source: ClientUploadSource): Promise<void> => {
     const name = source.kind === 'file' ? source.file.name : source.name
-    updateUpload(name, 0, '上传中')
-    try { appendRecord(await upload(source, (percent, uploadPhase) => { updateUpload(name, percent, uploadPhase) })) }
-    finally { setUploads(current => current.filter(item => item.name !== name)) }
+    const id = ++nextUploadId
+    updateUpload(id, name, 0, '上传中')
+    try { appendRecord(await upload(source, (percent, uploadPhase) => { updateUpload(id, name, percent, uploadPhase) })) }
+    finally { setUploads(current => current.filter(item => item.id !== id)) }
   }, [appendRecord, updateUpload, upload])
   const handleItems = useCallback(async (items: readonly IntakeItem[]): Promise<void> => {
     setError(null); setNotice(null)
@@ -141,7 +151,7 @@ export function AttachmentDock({ useInput, inputActions, list, upload, removeDra
     <input ref={folderInputRef} className={css.hidden} type="file" multiple onChange={event => { const files = [...(event.currentTarget.files ?? [])]; event.currentTarget.value = ''; void handleItems(collectWebkitDirectory(files)).catch(reportError) }} />
     {dragActive && <div className={css.overlay}><div className={css.overlayBox}>拖到这里，自动处理图片、文件和文件夹</div></div>}
     {visible && <div className={css.dock} data-dsh-dragndrop-attachment-dock="ready"><div className={css.rail}>
-      {uploads.map(item => <div className={css.card} key={`upload:${item.name}`}><div className={css.cardTop}><span className={css.icon}>UP</span><div className={css.meta}><div className={css.name}>{item.name}</div><div className={css.status}>{item.phase} · {item.percent}%</div></div></div><div className={css.progress}><div className={css.progressBar} style={{ width: `${item.percent}%` }} /></div></div>)}
+      {uploads.map(item => <div className={css.card} key={`upload:${item.id}`}><div className={css.cardTop}><span className={css.icon}>UP</span><div className={css.meta}><div className={css.name}>{item.name}</div><div className={css.status}>{item.phase} · {item.percent}%</div></div></div><div className={css.progress}><div className={css.progressBar} style={{ width: `${item.percent}%` }} /></div></div>)}
       {pending.map(record => <div className={css.card} key={record.attachmentId} data-attachment-id={record.attachmentId}><div className={css.cardTop}>
         <span className={css.icon}>{fileBadge(record)}</span><div className={css.meta}><div className={css.name} title={record.name}>{record.name}</div>
           <div className={css.status}>{record.kind === 'folder' ? `${record.fileCount} 文件 · ${record.directoryCount} 文件夹 · ` : ''}{record.status} · {formatBytes(record.bytes)} · 本地</div></div>

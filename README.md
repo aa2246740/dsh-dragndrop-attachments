@@ -17,12 +17,16 @@ The rest of the pipeline was built for DSH: page-wide drop and paste capture, fo
 ## 用户能直接做什么
 
 - 把图片、Markdown、文本、代码、CSV、DOCX、XLSX、PPTX、ZIP 或 Finder 文件夹拖到 DSH 页面任意位置；混合拖放也保持每个文件夹的根和相对路径。
+- 同时拖入多个文件、逐个拖入，甚至重复拖入同内容文件，都会保留为独立卡片和独立的本轮模型上下文；底层相同字节仍只存一份。
 - 从剪贴板粘贴文件或图片，或点击 DSH 原生 `+`，在同一菜单中选择“文件和文件夹”，再选择“选择文件”或“选择文件夹”；原有命令全部保留。
 - 预览、移除尚未提交的附件，并查看上传/解析进度和明确错误。
+- 发送时把卡片与该条用户消息原子绑定；对话记录会留下可展开的 `📎` 附件上下文回执，输入文字本身保持原样。
 - 直接发送超大像素图片。插件会按 DSH RC8 的原生边界无感等比缩放，再进入 DSH 原生图片管线。
 - 让模型按需搜索文档、读取 Word 语义路径、Excel/CSV 精确区间、PPT 页面与演讲者备注，而不是把整个文件粗暴塞进 prompt。
 - 让模型先看 ZIP 目录，再搜索其中的文本/代码并按准确路径和行范围读取；二进制条目只列目录，不盲目解压进 prompt。
-- 刷新页面或重新打开会话后继续查询已提交附件。
+- 对泛指的审阅请求优先读取本轮附件，不会因为工作区里存在其他文件而猜错目标；刷新页面或重新打开会话后仍可继续查询已提交附件。
+- 让模型以精确 `attachment_id` 调用统一的 `read_attachment`；Markdown/文本直接按行读取，不再猜 `block_0`，同名文件也不会混淆。
+- 在当前轮有附件时，将 `list_attachments` 限定到本轮卡片，并在工具执行前阻止用 `bash/find/grep/read_file` 去本地磁盘猜附件位置。
 
 ## 支持格式
 
@@ -37,9 +41,9 @@ The rest of the pipeline was built for DSH: page-wide drop and paste capture, fo
 | 压缩包 | ZIP | 安全目录索引；文本/代码跨文件搜索及按路径、行范围读取；二进制条目只列清单 |
 | 文件夹 | Finder 文件夹 | 目录、空目录（浏览器支持时）、相对路径和内容被保存为确定性本地快照；卡片和模型工具始终显示为文件夹，不显示伪造 ZIP 文件名 |
 
-旧版二进制 Office 文件 `.doc/.xls/.ppt` 不接受；请先另存为 `.docx/.xlsx/.pptx`。加密 Office 文件需先移除密码。PDF 尚未纳入 1.2.0。当前压缩包格式是 ZIP；RAR、7z、tar/tgz 和嵌套压缩包自动展开不在本版能力内。
+旧版二进制 Office 文件 `.doc/.xls/.ppt` 不接受；请先另存为 `.docx/.xlsx/.pptx`。加密 Office 文件需先移除密码。PDF 尚未纳入 1.2.1。当前压缩包格式是 ZIP；RAR、7z、tar/tgz 和嵌套压缩包自动展开不在本版能力内。
 
-默认边界：单文件 50 MiB、每会话 20 个附件、每会话总计 100 MiB。一个文件夹最多 10000 个条目、100 MiB 源文件和 128 MiB 确定性快照。Office 解析另有节点量、输出量和 30 秒超时边界。ZIP 在落盘前检查路径穿越、重复路径、压缩算法、最多 10000 个条目、解压后 256 MiB、单条目压缩比 100；单个可读文本条目上限 8 MiB，一次搜索最多解压 32 MiB 文本。
+默认边界：单文件 50 MiB、每会话 20 个附件、每会话总计 1 GiB。一个文件夹最多 10000 个条目、100 MiB 源文件和 128 MiB 确定性快照。Office 解析另有节点量、输出量和 30 秒超时边界。ZIP 在落盘前检查路径穿越、重复路径、压缩算法、最多 10000 个条目、解压后 256 MiB、单条目压缩比 100；单个可读文本条目上限 8 MiB，一次搜索最多解压 32 MiB 文本。
 
 ## 安装
 
@@ -47,6 +51,13 @@ The rest of the pipeline was built for DSH: page-wide drop and paste capture, fo
 
 ```sh
 dsh plugin --profile web add github:aa2246740/dsh-dragndrop-attachments
+```
+
+需要版本固定或离线传递时，从 [Releases](https://github.com/aa2246740/dsh-dragndrop-attachments/releases) 下载 `dsh-dragndrop-attachments-1.2.1.tgz`，核对 Release 页面给出的 SHA-256，然后执行：
+
+```sh
+tar -xzf dsh-dragndrop-attachments-1.2.1.tgz
+dsh plugin --profile web add ./package
 ```
 
 或本地 clone：
@@ -72,7 +83,7 @@ dsh plugin --profile web remove dsh-dragndrop-attachments
 
 ## 本地数据与隐私
 
-非图片附件保存在 `~/.dsh/dragndrop-attachments/v1`：内容寻址对象、结构化索引和按会话哈希命名的引用表彼此分离。模型只通过 10 个有界工具渐进读取当前会话附件。附件正文被明确标记为不可信用户数据，不会被当作系统指令。若本机存在早期私有预览版的 `~/.dsh/codex-attachments/v1`，插件会继续使用它，避免丢失原有会话附件。
+非图片附件保存在 `~/.dsh/dragndrop-attachments/v1`：内容寻址对象、结构化索引和按会话哈希命名的引用表彼此分离。浏览器拖放不会向网页暴露 Finder 原始绝对路径，插件也不会伪造或把用户目录传给模型；模型只看到每次选择唯一的 `attachment_id`，并通过 11 个有界工具渐进读取当前会话附件。附件正文被明确标记为不可信用户数据，不会被当作系统指令。若本机存在早期私有预览版的 `~/.dsh/codex-attachments/v1`，插件会继续使用它，避免丢失原有会话附件。
 
 图片沿用 DSH 原生草稿附件和模型输入路径。插件不建立额外上传服务、不启用 OfficeCLI 自动更新，也不自动安装 OfficeCLI 依赖；当模型实际调用附件工具时，工具返回的相关片段仍会按 DSH 当前模型配置发送给该模型提供方。
 
@@ -83,7 +94,7 @@ pnpm install --ignore-workspace --frozen-lockfile
 pnpm check
 /path/to/deepseek-harness-rc8/tools/dshx/skill/dshx/scripts/dshx.sh check dsh-dragndrop-attachments --harness /path/to/deepseek-harness-rc8
 pnpm release -- /path/to/output-directory
-pnpm verify:package -- /path/to/dsh-dragndrop-attachments-1.2.0.tgz
+pnpm verify:package -- /path/to/dsh-dragndrop-attachments-1.2.1.tgz
 ```
 
 `verify:package` 会从最终压缩包重新解压，在当前 pnpm 缓存下离线安装依赖，然后重新运行测试、构建、文件清单、OfficeCLI 版本与 SHA-256 校验。构建还会拒绝浏览器包中任何意外泄漏的 Node 内置模块，避免出现“本地构建成功、DSH 浏览器加载失败”的假绿灯。
@@ -93,7 +104,7 @@ pnpm verify:package -- /path/to/dsh-dragndrop-attachments-1.2.0.tgz
 - UI：外部 client 插件通过公开 `commandUi.register` 把附件入口并入官方 `+` 菜单；`conversation.input.dock` 只在上传、报错或已有附件时显示卡片；capture phase 接管页面拖放/粘贴。
 - 传输：loopback RPC，768 KiB 顺序 Base64 分块，临时文件提交后清理。
 - 存储：插件自己的本地 CAS/结构索引与原子会话引用，不改 RC8 只支持图片的原生附件协议。
-- 模型：`list_attachments`、outline、search、blocks、archive entry、folder entry、folder Office query、spreadsheet range、slide、document path 等有界工具；文件夹内 Office 仍按相对路径和父附件 ID 授权。
+- 模型：在 `agent/pre-step` 接受用户消息后原子绑定本轮卡片，并紧随该消息写入持久、可见的附件清单。`list_attachments` 在该轮只返回对应 ID，`read_attachment` 负责统一首读/搜索，专业工具继续处理 archive entry、folder entry、folder Office query、spreadsheet range、slide 和 document path。agent 作用域 guard 会在执行前拒绝针对本轮附件的广域文件系统定位；文件夹内 Office 仍按相对路径和父附件 ID 授权。
 - Office：随包固定 OfficeCLI 1.0.144（macOS arm64），校验信息见 `vendor/officecli/manifest.json`。
 
 第三方许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

@@ -4,7 +4,7 @@ import type { ArchiveRef } from './archive.js'
 export const MAX_FILE_BYTES = 50 * 1024 * 1024
 export const MAX_FOLDER_SNAPSHOT_BYTES = 128 * 1024 * 1024
 export const MAX_SESSION_FILES = 20
-export const MAX_SESSION_BYTES = 100 * 1024 * 1024
+export const MAX_SESSION_BYTES = 1024 * 1024 * 1024
 export const UPLOAD_CHUNK_BYTES = 768 * 1024
 
 export type AttachmentKind = 'text' | 'document' | 'archive' | 'folder'
@@ -16,9 +16,18 @@ export interface AttachmentWarning {
   readonly locator?: Record<string, unknown>
 }
 
+/** Latest durable user turn that consumed one composer attachment. */
+export interface AttachmentBinding {
+  readonly messageId: string
+  readonly turn: number
+  readonly step: number
+  readonly boundAt: string
+}
+
 export interface AttachmentRecordBase {
   /** Kept stable so records created by the private preview remain readable. */
   readonly schemaVersion: 'dsh-codex-attachment.v1'
+  /** Per-selection identity used by cards, turn receipts, and model tools; the ref below owns CAS identity. */
   readonly attachmentId: string
   readonly name: string
   readonly bytes: number
@@ -33,7 +42,12 @@ export interface AttachmentRecordBase {
   readonly preview: string
   readonly parser: string
   readonly createdAt: string
+  /** Whether this content has ever been made available to the conversation. */
   readonly committed: boolean
+  /** Composer membership. Missing on legacy records, where !committed is equivalent. */
+  readonly pending?: boolean
+  /** Latest turn binding; older bindings remain durable in the session log. */
+  readonly binding?: AttachmentBinding
 }
 
 export interface TextAttachmentRecord extends AttachmentRecordBase {
@@ -68,6 +82,11 @@ export interface FolderAttachmentRecord extends AttachmentRecordBase {
 
 export type AttachmentRecord = TextAttachmentRecord | DocumentAttachmentRecord | ArchiveAttachmentRecord | FolderAttachmentRecord
 
+/** Read both the current draft flag and records written before the flag existed. */
+export function isPendingAttachment(record: AttachmentRecord): boolean {
+  return record.pending ?? !record.committed
+}
+
 export interface AcceptedFile {
   readonly kind: Exclude<AttachmentKind, 'folder'>
   readonly mediaType: string
@@ -101,7 +120,7 @@ const ACTIONS: Record<AttachmentErrorCode, string> = {
   BAD_REQUEST: '请重新选择文件后再试。',
   FILE_TOO_LARGE: '请将单个文件控制在 50 MiB 以内，或拆分后重新上传。',
   TOO_MANY_ATTACHMENTS: '每个会话最多保留 20 个附件，请移除不需要的附件。',
-  ATTACHMENTS_TOO_LARGE: '每个会话附件总量最多 100 MiB，请拆分到其他会话。',
+  ATTACHMENTS_TOO_LARGE: '每个会话附件总量最多 1 GiB，请拆分到其他会话。',
   UNSUPPORTED_FILE_TYPE: '请使用 PNG/JPEG/WebP/GIF、TXT/Markdown、CSV、DOCX、XLSX、PPTX 或 ZIP。',
   LEGACY_OFFICE_UNSUPPORTED: '请用 Office 另存为 DOCX、XLSX 或 PPTX 后重新上传。',
   FILE_TYPE_MISMATCH: '文件扩展名与实际内容不一致，请修复文件后重新上传。',

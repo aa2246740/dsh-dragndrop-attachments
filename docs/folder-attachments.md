@@ -24,6 +24,7 @@ The model uses the existing attachment ID as the authority.
 
 ```ts
 await list_attachments()
+await read_attachment({ attachment_id: folderId })
 await get_attachment_outline({ attachment_id: folderId })
 await search_attachment({ attachment_id: folderId, query: "经营" })
 await read_folder_entry({ attachment_id: folderId, path: "docs/制度.md" })
@@ -35,6 +36,8 @@ await query_folder_document({
   range: "A1:F20",
 })
 ```
+
+`read_attachment` is the default routing entry. For a folder it returns the bounded outline; specialized folder tools then use only relative paths from that result. The model never searches the host filesystem for the dropped folder or guesses a Finder path.
 
 ## Shape
 

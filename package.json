@@ -1,6 +1,6 @@
 {
   "name": "dsh-dragndrop-attachments",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Local drag-and-drop attachments for DeepSeek Harness, delivered as an external plugin",
   "type": "module",
   "main": "lib/dsh-dragndrop-attachments.js",
@@ -92,6 +92,7 @@
     "@deepseek-ai/dsh-client-ui-conversation": "^0.1.0-rc.8",
     "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.8",
     "@deepseek-ai/dsh-home-paths": "^0.1.0-rc.8",
+    "@deepseek-ai/dsh-llm": "^0.1.0-rc.8",
     "@deepseek-ai/dsh-subprocess": "^0.1.0-rc.8",
     "@deepseek-ai/dsh-system-prompt": "^0.1.0-rc.8",
     "@deepseek-ai/dsh-tools": "^0.1.0-rc.8",
@@ -112,6 +113,7 @@
     "@deepseek-ai/dsh-client-ui-conversation": "0.1.0-rc.8",
     "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.8",
     "@deepseek-ai/dsh-home-paths": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-llm": "0.1.0-rc.8",
     "@deepseek-ai/dsh-subprocess": "0.1.0-rc.8",
     "@deepseek-ai/dsh-system-prompt": "0.1.0-rc.8",
     "@deepseek-ai/dsh-tools": "0.1.0-rc.8",

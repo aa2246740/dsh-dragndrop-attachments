@@ -3,7 +3,11 @@ import type {} from '@deepseek-ai/dsh-client-connection'
 import { AttachmentPluginError, normalizedError } from './domain.js'
 import type { AttachmentCatalog } from './catalog.js'
 import type { UploadManager } from './uploads.js'
-import { ATTACHMENT_RPC_CHANNEL, ENDPOINTS, isRecord, requiredInteger, requiredString } from './wire.js'
+import { ATTACHMENT_RPC_CHANNEL, ENDPOINTS, isRecord, requiredInteger, requiredString, RPC_PROTOCOL_VERSION } from './wire.js'
+
+function success<T>(value: T) {
+  return { ok: true as const, value }
+}
 
 function failure(error: unknown) {
   const normalized = error instanceof AttachmentPluginError
@@ -35,37 +39,37 @@ export function registerAttachmentRpc(ctx: Context, catalog: AttachmentCatalog, 
         const sessionId = requiredString(payload.sessionId, 'sessionId')
         switch (endpoint) {
           case ENDPOINTS.list:
-            return { ok: true as const, value: { attachments: await catalog.list(sessionId) } }
+            return success({ protocolVersion: RPC_PROTOCOL_VERSION, attachments: await catalog.list(sessionId) })
           case ENDPOINTS.remove:
-            return { ok: true as const, value: { removed: await catalog.removeDraft(sessionId, requiredString(payload.attachmentId, 'attachmentId')) } }
+            return success({ removed: await catalog.removeDraft(sessionId, requiredString(payload.attachmentId, 'attachmentId')) })
           case ENDPOINTS.commitReferences:
             await catalog.commitReferences(sessionId, stringArray(payload.attachmentIds, 'attachmentIds'))
-            return { ok: true as const, value: { committed: true } }
+            return success({ accepted: true })
           case ENDPOINTS.uploadBegin:
-            return { ok: true as const, value: await uploads.begin(sessionId, {
+            return success(await uploads.begin(sessionId, {
               kind: 'file', name: requiredString(payload.name, 'name'), bytes: requiredInteger(payload.bytes, 'bytes'),
-            }) }
+            }))
           case ENDPOINTS.folderUploadBegin:
-            return { ok: true as const, value: await uploads.begin(sessionId, {
+            return success(await uploads.begin(sessionId, {
               kind: 'folder',
               name: requiredString(payload.name, 'name'),
               snapshotBytes: requiredInteger(payload.snapshotBytes, 'snapshotBytes'),
               sourceBytes: requiredInteger(payload.sourceBytes, 'sourceBytes'),
               fileCount: requiredInteger(payload.fileCount, 'fileCount'),
               directoryCount: requiredInteger(payload.directoryCount, 'directoryCount'),
-            }) }
+            }))
           case ENDPOINTS.uploadChunk:
-            return { ok: true as const, value: await uploads.chunk(
+            return success(await uploads.chunk(
               sessionId,
               requiredString(payload.uploadId, 'uploadId'),
               requiredInteger(payload.index, 'index'),
               requiredString(payload.data, 'data'),
-            ) }
+            ))
           case ENDPOINTS.uploadCommit:
-            return { ok: true as const, value: await uploads.commit(sessionId, requiredString(payload.uploadId, 'uploadId')) }
+            return success(await uploads.commit(sessionId, requiredString(payload.uploadId, 'uploadId')))
           case ENDPOINTS.uploadCancel:
             await uploads.cancel(sessionId, requiredString(payload.uploadId, 'uploadId'))
-            return { ok: true as const, value: { cancelled: true } }
+            return success({ cancelled: true })
           default:
             throw new Error(`unknown attachment endpoint: ${endpoint}`)
         }

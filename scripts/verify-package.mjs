@@ -20,9 +20,10 @@ function capture(command, args, options = {}) {
 function sha256(bytes) { return createHash('sha256').update(bytes).digest('hex') }
 
 const archiveArg = process.argv.slice(2).find(value => value !== '--')
-if (!archiveArg) throw new Error('usage: pnpm verify:package -- /absolute/path/dsh-dragndrop-attachments-1.2.0.tgz')
+if (!archiveArg) throw new Error('usage: pnpm verify:package -- /absolute/path/dsh-dragndrop-attachments-X.Y.Z.tgz')
 const archive = resolve(archiveArg)
 await stat(archive)
+const expectedManifest = JSON.parse(await readFile(join(process.cwd(), 'package.json'), 'utf8'))
 
 const entries = capture('tar', ['-tzf', archive]).split('\n').filter(Boolean)
 const required = [
@@ -30,11 +31,15 @@ const required = [
   'package/pnpm-lock.yaml',
   'package/install.sh',
   'package/cordis.yml',
+  'package/cordis.patch.yml',
   'package/dshx.yml',
   'package/lib/dsh-dragndrop-attachments.js',
   'package/lib/client.js',
   'package/src/dsh-dragndrop-attachments.ts',
+  'package/src/turn-context.ts',
   'package/tests/common.spec.ts',
+  'package/tests/routing.spec.ts',
+  'package/tests/turn-context.spec.ts',
   'package/vendor/officecli/manifest.json',
   'package/vendor/officecli/darwin-arm64/officecli',
   'package/README.md',
@@ -62,8 +67,11 @@ try {
   if ((installMode & 0o111) === 0) throw new Error('install.sh is not executable')
   if ((officeMode & 0o111) === 0) throw new Error('OfficeCLI is not executable')
   const manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))
-  if (manifest.name !== 'dsh-dragndrop-attachments' || manifest.version !== '1.2.0') throw new Error('unexpected package identity')
+  if (manifest.name !== expectedManifest.name || manifest.version !== expectedManifest.version) {
+    throw new Error(`unexpected package identity: ${manifest.name}@${manifest.version}`)
+  }
   if (manifest.dsh?.client?.entry !== './lib/client.js') throw new Error('missing DSH client manifest entry')
+  if (manifest.dsh?.bundle?.patch !== './cordis.patch.yml') throw new Error('missing official DSH bundle manifest entry')
 
   const officeManifest = JSON.parse(await readFile(join(root, 'vendor/officecli/manifest.json'), 'utf8'))
   const officePath = join(root, 'vendor/officecli', officeManifest.assets['darwin-arm64'].path)

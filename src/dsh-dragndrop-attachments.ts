@@ -11,6 +11,7 @@ import type {} from '@deepseek-ai/dsh-tools'
 import { AttachmentCatalog } from './catalog.js'
 import { registerAttachmentRpc } from './rpc.js'
 import { registerAttachmentTools } from './tools.js'
+import { AttachmentTurnState, registerAttachmentTurnContext } from './turn-context.js'
 import { UploadManager } from './uploads.js'
 
 export const name = 'dsh-dragndrop-attachments'
@@ -50,7 +51,9 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   const install = (agent: Agent): void => {
     if (agent.session.header.origin === 'subagent' || fibers.has(agent)) return
     fibers.set(agent, agent.ctx.inject(['tools', 'systemPrompt'], scope => {
-      registerAttachmentTools(scope, catalog, agent.session.id)
+      const turnState = new AttachmentTurnState()
+      registerAttachmentTools(scope, catalog, agent.session.id, turnState)
+      registerAttachmentTurnContext(scope, catalog, agent.session.id, turnState)
     }))
   }
   const dispose = (agent: Agent): void => {

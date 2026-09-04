@@ -39,12 +39,12 @@ function fileBadge(record: AttachmentRecord): string {
   return extension === undefined ? 'FILE' : extension.slice(0, 4)
 }
 
-export function AttachmentDock({ useSession, useInput, inputActions, list, upload, removeDraft, commitReferences, registerPicker, attachNativeImages }: AttachmentDockProps) {
+export function AttachmentDock({ useConversation, useInput, inputActions, list, upload, removeDraft, commitReferences, registerPicker, attachNativeImages }: AttachmentDockProps) {
   const phase = useInput(state => state.phase)
-  const latestUserSeq = useSession(snapshot => snapshot.nodes.reduce(
+  const latestUserSeq = useConversation(snapshot => snapshot.views.get('chat')?.legacy.nodes.reduce(
     (latest, node) => node.kind === 'user' ? Math.max(latest, node.seq) : latest,
     0,
-  ))
+  ) ?? 0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
   const handleItemsRef = useRef<(items: readonly IntakeItem[]) => Promise<void>>(() => Promise.resolve())

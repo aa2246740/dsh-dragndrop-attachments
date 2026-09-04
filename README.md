@@ -1,6 +1,6 @@
 # DSH DragNDrop Attachments
 
-A DeepSeek Harness RC8 plugin for dragging files, Finder folders, Office documents, and ZIP archives into a session. It indexes them locally, then gives the model tools to retrieve the requested lines, ranges, slides, notes, or archive entries.
+A DeepSeek Harness 0.1.2-rc.1 plugin for dragging files, Finder folders, Office documents, and ZIP archives into a session. It indexes them locally, then gives the model tools to retrieve the requested lines, ranges, slides, notes, or archive entries.
 
 ![DSH DragNDrop Attachments architecture](docs/assets/dsh-dragndrop-architecture.png)
 
@@ -21,7 +21,7 @@ The rest of the pipeline was built for DSH: page-wide drop and paste capture, fo
 - 从剪贴板粘贴文件或图片，或点击 DSH 原生 `+`，在同一菜单中选择“文件和文件夹”，再选择“选择文件”或“选择文件夹”；原有命令全部保留。
 - 预览、移除尚未提交的附件，并查看上传/解析进度和明确错误。
 - 发送时把卡片与该条用户消息原子绑定；对话记录会留下可展开的 `📎` 附件上下文回执，输入文字本身保持原样。
-- 直接发送超大像素图片。插件会按 DSH RC8 的原生边界无感等比缩放，再进入 DSH 原生图片管线。
+- 直接发送超大像素图片。插件会按 DSH 0.1.2-rc.1 的原生边界无感等比缩放，再进入 DSH 原生图片管线。
 - 让模型按需搜索文档、读取 Word 语义路径、Excel/CSV 精确区间、PPT 页面与演讲者备注，而不是把整个文件粗暴塞进 prompt。
 - 让模型先看 ZIP 目录，再搜索其中的文本/代码并按准确路径和行范围读取；二进制条目只列目录，不盲目解压进 prompt。
 - 对泛指的审阅请求优先读取本轮附件，不会因为工作区里存在其他文件而猜错目标；刷新页面或重新打开会话后仍可继续查询已提交附件。
@@ -47,7 +47,7 @@ The rest of the pipeline was built for DSH: page-wide drop and paste capture, fo
 
 ## 安装
 
-不需要 dshx。默认走官方 `dsh`。当前发布面向 macOS Apple Silicon、DeepSeek Harness `0.1.0-rc.8`、Node.js 22.19+。
+不需要 dshx。默认走官方 `dsh`。当前发布面向 macOS Apple Silicon、DeepSeek Harness `0.1.2-rc.1`、Node.js 22.19+。
 
 ```sh
 dsh plugin --profile web add github:aa2246740/dsh-dragndrop-attachments
@@ -103,7 +103,7 @@ pnpm verify:package -- /path/to/dsh-dragndrop-attachments-1.2.1.tgz
 
 - UI：外部 client 插件通过公开 `commandUi.register` 把附件入口并入官方 `+` 菜单；`conversation.input.dock` 只在上传、报错或已有附件时显示卡片；capture phase 接管页面拖放/粘贴。
 - 传输：loopback RPC，768 KiB 顺序 Base64 分块，临时文件提交后清理。
-- 存储：插件自己的本地 CAS/结构索引与原子会话引用，不改 RC8 只支持图片的原生附件协议。
+- 存储：插件自己的本地 CAS/结构索引与原子会话引用，不改 DSH 原生仅支持图片的附件协议。
 - 模型：在 `agent/pre-step` 接受用户消息后原子绑定本轮卡片，并紧随该消息写入持久、可见的附件清单。`list_attachments` 在该轮只返回对应 ID，`read_attachment` 负责统一首读/搜索，专业工具继续处理 archive entry、folder entry、folder Office query、spreadsheet range、slide 和 document path。agent 作用域 guard 会在执行前拒绝针对本轮附件的广域文件系统定位；文件夹内 Office 仍按相对路径和父附件 ID 授权。
 - Office：随包固定 OfficeCLI 1.0.144（macOS arm64），校验信息见 `vendor/officecli/manifest.json`。
 

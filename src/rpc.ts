@@ -77,6 +77,5 @@ export function registerAttachmentRpc(ctx: Context, catalog: AttachmentCatalog, 
         return failure(error)
       }
     },
-    { authority: 'loopback' },
   )
 }

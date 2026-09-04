@@ -1,7 +1,12 @@
-import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ComposerAttachment, DraftAttachmentId } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-connection/client'
+import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
+import type {} from '@deepseek-ai/dsh-client-ui-commands/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { AttachmentRecord } from '../domain.js'
 import { ATTACHMENT_RPC_CHANNEL, ENDPOINTS, hasCurrentRpcProtocol, isRecord, type RpcResult } from '../wire.js'
@@ -23,21 +28,6 @@ interface NativeConversation {
   releaseDraftImages(attachments: readonly ComposerAttachment[]): void
 }
 
-interface CommandSession { readonly sessionId: SessionId }
-interface PickerOption { readonly id: 'file' | 'folder'; readonly label: string }
-interface CommandUi {
-  register(contribution: {
-    readonly name: string
-    readonly description: string
-    available(session: CommandSession): boolean
-    readonly ui: {
-      readonly kind: 'popupSelect'
-      options(session: CommandSession, signal: AbortSignal): Promise<readonly PickerOption[]>
-      onSelect(option: PickerOption, session: CommandSession): void | Promise<void>
-    }
-  }): () => void
-}
-
 const ATTACHMENT_MENU_LABEL = '文件和文件夹'
 const ATTACHMENT_MENU_DETAIL = '添加图片、文档、ZIP 或整个文件夹'
 
@@ -53,15 +43,7 @@ function nativeConversation(value: unknown): NativeConversation {
   return value as unknown as NativeConversation
 }
 
-function commandUi(value: unknown): CommandUi {
-  if (!isRecord(value) || typeof value.register !== 'function') {
-    throw new Error('DSH 原生 + 菜单不可用。')
-  }
-  return value as unknown as CommandUi
-}
-
-
-/** Keep the attachment action at the top of DSH RC8's shared +/command list. */
+/** Keep the attachment action at the top of DSH RC1's shared +/command list. */
 function bindAttachmentMenuPlacement(): () => void {
   let queued = false
   const promote = (): void => {
@@ -110,8 +92,7 @@ export function apply(ctx: ClientContext): void {
   const pickers = new Map<SessionId, { readonly openFile: () => Promise<void>; readonly openFolder: () => Promise<void> }>()
   ctx.effect(bindAttachmentMenuPlacement, 'dsh-dragndrop-attachments: pin native + menu entry')
   ctx.inject(['commandUi'], (scope: ClientContext) => {
-    const commands = commandUi(scope.get('commandUi'))
-    scope.effect(() => commands.register({
+    scope.effect(() => scope.commandUi.register({
       name: '文件和文件夹',
       description: ATTACHMENT_MENU_DETAIL,
       available: session => pickers.has(session.sessionId),
@@ -119,6 +100,7 @@ export function apply(ctx: ClientContext): void {
         kind: 'popupSelect',
         options: async () => [{ id: 'file', label: '选择文件' }, { id: 'folder', label: '选择文件夹' }],
         onSelect: (option, session): void | Promise<void> => {
+          if (option.id !== 'file' && option.id !== 'folder') throw new Error(`未知附件选择方式：${option.id}`)
           const picker = pickers.get(session.sessionId)
           if (picker === undefined) return
           return option.id === 'file' ? picker.openFile() : picker.openFolder()

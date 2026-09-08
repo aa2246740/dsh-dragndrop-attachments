@@ -112,6 +112,9 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
     name: 'conversation.input.dock', id: 'dsh-dragndrop-attachments', order: -20, priority: 80,
     inject: (sessionId: SessionId): AttachmentDockInjected => {
+      const activeUploads = new Set<string>()
+      let acceptingUploads = true
+      let uploadGeneration = 0
       let protocolReady = false
       let protocolProbe: Promise<void> | undefined
       const rawCall = async (endpoint: string, payload: Record<string, unknown>): Promise<unknown> => {
@@ -144,6 +147,9 @@ export function apply(ctx: ClientContext): void {
       return {
         list: readList,
         upload: async (source: ClientUploadSource, progress) => {
+          const generation = uploadGeneration
+          const isCurrent = (): boolean => acceptingUploads && generation === uploadGeneration
+          if (!isCurrent()) throw new Error('附件上传已取消。')
           const file = source.kind === 'file' ? source.file : undefined
           const bytes = source.kind === 'file' ? undefined : source.snapshot
           const name = source.kind === 'file' ? source.file.name : source.name
@@ -154,6 +160,11 @@ export function apply(ctx: ClientContext): void {
               : { name, snapshotBytes: total, sourceBytes: source.sourceBytes, fileCount: source.fileCount, directoryCount: source.directoryCount })
           if (!isRecord(begun) || typeof begun.uploadId !== 'string' || typeof begun.chunkBytes !== 'number') throw new Error('附件上传初始化失败。')
           const uploadId = begun.uploadId
+          if (!isCurrent()) {
+            await rawCall(ENDPOINTS.uploadCancel, { uploadId }).catch(() => {})
+            throw new Error('附件上传已取消。')
+          }
+          activeUploads.add(uploadId)
           try {
             let index = 0
             for (let offset = 0; offset < total; offset += begun.chunkBytes) {
@@ -161,14 +172,17 @@ export function apply(ctx: ClientContext): void {
                 ? bytes!.slice(offset, Math.min(total, offset + begun.chunkBytes))
                 : new Uint8Array(await file.slice(offset, Math.min(total, offset + begun.chunkBytes)).arrayBuffer())
               await call(ENDPOINTS.uploadChunk, { uploadId, index, data: bytesToBase64(chunk) })
+              if (!isCurrent()) throw new Error('附件上传已取消。')
               index += 1
               progress(Math.min(99, Math.round(Math.min(total, offset + chunk.byteLength) / total * 100)), '上传中')
             }
             progress(100, source.kind === 'folder' ? '建立文件夹索引中' : /\.(docx|xlsx|pptx|csv)$/iu.test(name) ? '本地解析中' : '建立索引中')
             return parseRecord(await call(ENDPOINTS.uploadCommit, { uploadId }))
           } catch (error) {
-            await call(ENDPOINTS.uploadCancel, { uploadId }).catch(() => {})
+            await rawCall(ENDPOINTS.uploadCancel, { uploadId }).catch(() => {})
             throw error
+          } finally {
+            activeUploads.delete(uploadId)
           }
         },
         removeDraft: async (attachmentId) => {
@@ -176,6 +190,16 @@ export function apply(ctx: ClientContext): void {
           return isRecord(value) && value.removed === true
         },
         commitReferences: async (attachmentIds) => { await call(ENDPOINTS.commitReferences, { attachmentIds }) },
+        activateUploads: () => { acceptingUploads = true },
+        releaseUploads: async () => {
+          // Injected props survive a dock remount. Cancel this generation only;
+          // the next mount must be able to accept new files without reviving old work.
+          acceptingUploads = false
+          uploadGeneration += 1
+          const released = [...activeUploads]
+          activeUploads.clear()
+          await Promise.all(released.map(uploadId => rawCall(ENDPOINTS.uploadCancel, { uploadId })))
+        },
         registerPicker: (open) => {
           pickers.set(sessionId, open)
           return () => { if (pickers.get(sessionId) === open) pickers.delete(sessionId) }

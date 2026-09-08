@@ -21,6 +21,8 @@ export interface AttachmentDockInjected {
   readonly upload: (source: ClientUploadSource, progress: (percent: number, phase: string) => void) => Promise<AttachmentRecord>
   readonly removeDraft: (attachmentId: string) => Promise<boolean>
   readonly commitReferences: (attachmentIds: readonly string[]) => Promise<void>
+  readonly activateUploads: () => void
+  readonly releaseUploads: () => Promise<void>
   readonly registerPicker: (picker: { readonly openFile: () => Promise<void>; readonly openFolder: () => Promise<void> }) => () => void
   readonly attachNativeImages: (files: readonly File[], accept: (ids: readonly DraftAttachmentId[]) => boolean) => Promise<readonly { readonly name: string; readonly resized: boolean; readonly source: string; readonly output: string }[]>
 }
@@ -39,7 +41,7 @@ function fileBadge(record: AttachmentRecord): string {
   return extension === undefined ? 'FILE' : extension.slice(0, 4)
 }
 
-export function AttachmentDock({ useConversation, useInput, inputActions, list, upload, removeDraft, commitReferences, registerPicker, attachNativeImages }: AttachmentDockProps) {
+export function AttachmentDock({ useConversation, useInput, inputActions, list, upload, removeDraft, commitReferences, activateUploads, releaseUploads, registerPicker, attachNativeImages }: AttachmentDockProps) {
   const phase = useInput(state => state.phase)
   const latestUserSeq = useConversation(snapshot => snapshot.views.get('chat')?.legacy.nodes.reduce(
     (latest, node) => node.kind === 'user' ? Math.max(latest, node.seq) : latest,
@@ -91,6 +93,10 @@ export function AttachmentDock({ useConversation, useInput, inputActions, list, 
     input?.setAttribute('directory', '')
   }, [])
   useEffect(() => registerPicker({ openFile, openFolder }), [openFile, openFolder, registerPicker])
+  useEffect(() => {
+    activateUploads()
+    return () => { void releaseUploads().catch(() => {}) }
+  }, [activateUploads, releaseUploads])
 
   const refresh = useCallback(async (): Promise<void> => { setRecords(await list()) }, [list])
   useEffect(() => { void refresh().catch(value => { setError(value instanceof Error ? value.message : String(value)) }) }, [refresh])

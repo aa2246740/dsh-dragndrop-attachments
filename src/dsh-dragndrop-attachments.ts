@@ -12,7 +12,7 @@ import { AttachmentCatalog } from './catalog.js'
 import { registerAttachmentRpc } from './rpc.js'
 import { registerAttachmentTools } from './tools.js'
 import { AttachmentTurnState, registerAttachmentTurnContext } from './turn-context.js'
-import { UploadManager } from './uploads.js'
+import { DEFAULT_UPLOAD_IDLE_TIMEOUT_MS, DEFAULT_UPLOAD_SWEEP_INTERVAL_MS, UploadManager } from './uploads.js'
 
 export const name = 'dsh-dragndrop-attachments'
 export const inject = ['agents', 'connection', 'subprocess']
@@ -21,12 +21,16 @@ export interface Config {
   readonly enabled?: boolean
   readonly dataDir?: string
   readonly officeCliPath?: string
+  readonly uploadIdleTimeoutMs?: number
+  readonly uploadSweepIntervalMs?: number
 }
 
 export const Config: z<Config> = z.object({
   enabled: z.boolean().default(true),
   dataDir: z.string().default(''),
   officeCliPath: z.string().default(''),
+  uploadIdleTimeoutMs: z.number().step(1).min(1).default(DEFAULT_UPLOAD_IDLE_TIMEOUT_MS),
+  uploadSweepIntervalMs: z.number().step(1).min(1).default(DEFAULT_UPLOAD_SWEEP_INTERVAL_MS),
 })
 
 export async function apply(ctx: Context, config: Config = {}): Promise<void> {
@@ -44,7 +48,10 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
     root: resolve(dataRoot),
     ...(config.officeCliPath?.trim() ? { officeCliPath: resolve(config.officeCliPath.trim()) } : {}),
   })
-  const uploads = await UploadManager.open(catalog)
+  const uploads = await UploadManager.open(catalog, {
+    idleTimeoutMs: config.uploadIdleTimeoutMs,
+    sweepIntervalMs: config.uploadSweepIntervalMs,
+  })
   registerAttachmentRpc(ctx, catalog, uploads)
 
   const fibers = new Map<Agent, ReturnType<Context['inject']>>()
@@ -57,6 +64,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
     }))
   }
   const dispose = (agent: Agent): void => {
+    void uploads.cancelSession(String(agent.session.id)).catch(error => ctx.logger.warn(`dsh-dragndrop-attachments upload cleanup failed: ${String(error)}`))
     const fiber = fibers.get(agent)
     if (fiber === undefined) return
     fibers.delete(agent)

@@ -22,6 +22,27 @@ interface UploadState {
   expectedChunk: number
   receivedBytes: number
   busy: boolean
+  lastActivityAt: number
+  cleanupAfterBusy: boolean
+}
+
+interface PendingBegin {
+  readonly sessionId: string
+  readonly settled: Promise<void>
+  readonly settle: () => void
+  cancelled: boolean
+  reserved: boolean
+}
+
+export const DEFAULT_UPLOAD_IDLE_TIMEOUT_MS = 2 * 60_000
+export const DEFAULT_UPLOAD_SWEEP_INTERVAL_MS = 15_000
+export const DEFAULT_MAX_CONCURRENT_UPLOADS = 8
+
+export interface UploadManagerOptions {
+  readonly idleTimeoutMs?: number
+  readonly sweepIntervalMs?: number
+  readonly maxConcurrentUploads?: number
+  readonly now?: () => number
 }
 
 export type UploadSource =
@@ -47,19 +68,33 @@ function strictBase64(value: string): Uint8Array {
 
 export class UploadManager {
   private readonly uploads = new Map<string, UploadState>()
+  private readonly pendingBegins = new Set<PendingBegin>()
+  private readonly idleTimeoutMs: number
+  private readonly maxConcurrentUploads: number
+  private readonly now: () => number
+  private readonly sweepTimer: NodeJS.Timeout
+  private closed = false
+  private closePromise: Promise<void> | undefined
 
-  private constructor(private readonly catalog: AttachmentCatalog, private readonly uploadRoot: string) {}
+  private constructor(private readonly catalog: AttachmentCatalog, private readonly uploadRoot: string, options: UploadManagerOptions) {
+    this.idleTimeoutMs = positiveInteger(options.idleTimeoutMs ?? DEFAULT_UPLOAD_IDLE_TIMEOUT_MS, 'idleTimeoutMs')
+    this.maxConcurrentUploads = positiveInteger(options.maxConcurrentUploads ?? DEFAULT_MAX_CONCURRENT_UPLOADS, 'maxConcurrentUploads')
+    this.now = options.now ?? Date.now
+    const sweepIntervalMs = positiveInteger(options.sweepIntervalMs ?? DEFAULT_UPLOAD_SWEEP_INTERVAL_MS, 'sweepIntervalMs')
+    this.sweepTimer = setInterval(() => { void this.expireIdle().catch(() => {}) }, sweepIntervalMs)
+    this.sweepTimer.unref()
+  }
 
-  static async open(catalog: AttachmentCatalog): Promise<UploadManager> {
+  static async open(catalog: AttachmentCatalog, options: UploadManagerOptions = {}): Promise<UploadManager> {
     const root = join(catalog.root, 'tmp', 'uploads')
     await mkdir(root, { recursive: true, mode: 0o700 })
     const stale = await readdir(root)
     await Promise.all(stale.filter(name => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.part$/iu.test(name)).map(name => unlink(join(root, name)).catch(() => {})))
-    return new UploadManager(catalog, root)
+    return new UploadManager(catalog, root, options)
   }
 
   async begin(sessionId: string, rawSource: UploadSource | string, legacyBytes?: number): Promise<{ readonly uploadId: string; readonly chunkBytes: number }> {
-    if (this.uploads.size >= 8) throw new AttachmentPluginError('同时上传的附件过多。', 'BAD_REQUEST')
+    this.assertOpen()
     const source: UploadSource = typeof rawSource === 'string'
       ? { kind: 'file', name: rawSource, bytes: legacyBytes ?? -1 }
       : rawSource
@@ -71,15 +106,41 @@ export class UploadManager {
       || !Number.isSafeInteger(source.directoryCount) || source.directoryCount < 0 || source.sourceBytes > 100 * 1024 * 1024)) {
       throw new AttachmentPluginError('文件夹元数据无效。', 'BAD_REQUEST')
     }
+    let settleBegin!: () => void
+    const beginSettled = new Promise<void>(resolve => { settleBegin = resolve })
+    const pending: PendingBegin = {
+      sessionId,
+      settled: beginSettled,
+      settle: settleBegin,
+      cancelled: false,
+      reserved: false,
+    }
+    this.pendingBegins.add(pending)
     const uploadId = randomUUID()
     const path = join(this.uploadRoot, `${uploadId}.part`)
-    const handle = await open(path, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600)
-    await handle.close()
-    this.uploads.set(uploadId, {
-      uploadId, sessionId, name: sanitizeName(source.name), source: { ...source, name: sanitizeName(source.name) }, declaredBytes, path,
-      expectedChunk: 0, receivedBytes: 0, busy: false,
-    })
-    return { uploadId, chunkBytes: UPLOAD_CHUNK_BYTES }
+    let created = false
+    try {
+      await this.expireIdle()
+      this.assertPending(pending)
+      const reservedBegins = [...this.pendingBegins].filter(begin => begin.reserved).length
+      if (this.uploads.size + reservedBegins >= this.maxConcurrentUploads) {
+        throw new AttachmentPluginError('同时上传的附件过多。', 'BAD_REQUEST')
+      }
+      pending.reserved = true
+      const handle = await open(path, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600)
+      created = true
+      await handle.close()
+      this.assertPending(pending)
+      this.uploads.set(uploadId, {
+        uploadId, sessionId, name: sanitizeName(source.name), source: { ...source, name: sanitizeName(source.name) }, declaredBytes, path,
+        expectedChunk: 0, receivedBytes: 0, busy: false, lastActivityAt: this.now(), cleanupAfterBusy: false,
+      })
+      return { uploadId, chunkBytes: UPLOAD_CHUNK_BYTES }
+    } finally {
+      if (created && !this.uploads.has(uploadId)) await unlink(path).catch(() => {})
+      this.pendingBegins.delete(pending)
+      pending.settle()
+    }
   }
 
   async chunk(sessionId: string, uploadId: string, index: number, encoded: string): Promise<{ readonly receivedBytes: number }> {
@@ -94,9 +155,11 @@ export class UploadManager {
       await appendFile(state.path, bytes)
       state.receivedBytes += bytes.byteLength
       state.expectedChunk += 1
+      state.lastActivityAt = this.now()
       return { receivedBytes: state.receivedBytes }
     } finally {
       state.busy = false
+      if (state.cleanupAfterBusy) await unlink(state.path).catch(() => {})
     }
   }
 
@@ -118,14 +181,44 @@ export class UploadManager {
 
   async cancel(sessionId: string, uploadId: string): Promise<void> {
     const state = this.require(sessionId, uploadId)
-    this.uploads.delete(uploadId)
-    await unlink(state.path).catch(() => {})
+    await this.release(state)
+  }
+
+  async cancelSession(sessionId: string): Promise<number> {
+    const pending = [...this.pendingBegins].filter(begin => begin.sessionId === sessionId)
+    for (const begin of pending) begin.cancelled = true
+    const states = [...this.uploads.values()].filter(state => state.sessionId === sessionId)
+    await Promise.all([...pending.map(begin => begin.settled), ...states.map(state => this.release(state))])
+    return pending.length + states.length
+  }
+
+  async expireIdle(): Promise<number> {
+    const cutoff = this.now() - this.idleTimeoutMs
+    const states = [...this.uploads.values()].filter(state => !state.busy && state.lastActivityAt <= cutoff)
+    await Promise.all(states.map(state => this.release(state)))
+    return states.length
   }
 
   async close(): Promise<void> {
-    const states = [...this.uploads.values()]
-    this.uploads.clear()
-    await Promise.all(states.map(state => unlink(state.path).catch(() => {})))
+    if (this.closePromise !== undefined) return this.closePromise
+    this.closed = true
+    for (const begin of this.pendingBegins) begin.cancelled = true
+    clearInterval(this.sweepTimer)
+    this.closePromise = (async () => {
+      await Promise.all([...this.pendingBegins].map(begin => begin.settled))
+      const states = [...this.uploads.values()]
+      await Promise.all(states.map(state => this.release(state)))
+    })()
+    return this.closePromise
+  }
+
+  private async release(state: UploadState): Promise<void> {
+    this.uploads.delete(state.uploadId)
+    if (state.busy) {
+      state.cleanupAfterBusy = true
+      return
+    }
+    await unlink(state.path).catch(() => {})
   }
 
   private require(sessionId: string, uploadId: string): UploadState {
@@ -133,4 +226,18 @@ export class UploadManager {
     if (state === undefined || state.sessionId !== sessionId) throw new AttachmentPluginError('上传会话不存在。', 'BAD_REQUEST')
     return state
   }
+
+  private assertOpen(): void {
+    if (this.closed) throw new AttachmentPluginError('上传服务已关闭。', 'BAD_REQUEST')
+  }
+
+  private assertPending(pending: PendingBegin): void {
+    this.assertOpen()
+    if (pending.cancelled) throw new AttachmentPluginError('上传会话已取消。', 'BAD_REQUEST')
+  }
+}
+
+function positiveInteger(value: number, field: string): number {
+  if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`${field} must be a positive integer`)
+  return value
 }

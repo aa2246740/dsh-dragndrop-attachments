@@ -74,8 +74,6 @@ export function createAttachmentContextMessage(records: readonly AttachmentRecor
       plugin: PLUGIN_ID,
       form: 'notice',
       summary: summary(records),
-      attachmentIds: records.map(record => record.attachmentId),
-      boundToMessageId: binding.messageId,
     },
   })
 }

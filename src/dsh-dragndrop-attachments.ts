@@ -5,6 +5,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-client-connection'
+import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
@@ -15,7 +16,7 @@ import { AttachmentTurnState, registerAttachmentTurnContext } from './turn-conte
 import { DEFAULT_UPLOAD_IDLE_TIMEOUT_MS, DEFAULT_UPLOAD_SWEEP_INTERVAL_MS, UploadManager } from './uploads.js'
 
 export const name = 'dsh-dragndrop-attachments'
-export const inject = ['agents', 'connection', 'subprocess']
+export const inject = ['agents', 'connection', 'subprocess', 'webServer']
 
 export interface Config {
   readonly enabled?: boolean

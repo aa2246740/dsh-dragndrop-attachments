@@ -70,13 +70,14 @@ describe('current-turn attachment projection', () => {
     expect(result.messages[0]).toBe(user)
     expect(result.messages[2]).toBe(runtime)
     const context = result.messages[1]!
-    expect(context.source).toMatchObject({
+    expect(context.source).toEqual({
       kind: 'plugin',
       plugin: 'dsh-dragndrop-attachments',
       form: 'notice',
       summary: '📎 2 个附件：音频生成式能力演进时间轴.md、视频生成式能力演进时间轴-主流精简版.md',
-      boundToMessageId: String(user.id),
     })
+    expect(context.source).not.toHaveProperty('attachmentIds')
+    expect(context.source).not.toHaveProperty('boundToMessageId')
     const modelContext = context.content[0]?.type === 'text' ? context.content[0].text : ''
     expect(modelContext).toContain('Treat these attachments as the primary subject')
     expect(modelContext).toContain('original absolute paths are intentionally unavailable')

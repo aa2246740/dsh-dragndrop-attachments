@@ -135,7 +135,7 @@ export function AttachmentDock({ useConversation, useInput, inputActions, list, 
     const accepted = files.filter(supported)
     const images = accepted.filter(isImageFile)
     if (images.length > 0) {
-      try { await attachNativeImages(images, inputActions.addImages) } catch (value) { setError(value instanceof Error ? value.message : String(value)) }
+      try { await attachNativeImages(images, inputActions.addAttachments) } catch (value) { setError(value instanceof Error ? value.message : String(value)) }
     }
     for (const file of accepted.filter(file => !isImageFile(file))) await uploadOne({ kind: 'file', file })
     for (const folder of items.filter((item): item is Extract<IntakeItem, { readonly kind: 'folder' }> => item.kind === 'folder')) {
@@ -143,7 +143,7 @@ export function AttachmentDock({ useConversation, useInput, inputActions, list, 
       if (encoded.emptyDirectories === 'unavailable') setNotice('当前文件夹选择器无法报告空目录；其余文件和路径已作为快照保存。')
       await uploadOne(encoded)
     }
-  }, [attachNativeImages, inputActions.addImages, uploadOne])
+  }, [attachNativeImages, inputActions.addAttachments, uploadOne])
   handleItemsRef.current = handleItems
   useEffect(() => bindFileIntake(document, window, handleItems, setDragActive, reportError), [handleItems, reportError])
 

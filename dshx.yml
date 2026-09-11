@@ -3,3 +3,10 @@ entry: src/dsh-dragndrop-attachments.ts
 marker: "[my-plugins/dsh-dragndrop-attachments] loaded"
 kind: client
 profile: web
+hotReload:
+  artifacts:
+    - src/dsh-dragndrop-attachments.ts
+    - src/rpc.ts
+    - src/turn-context.ts
+    - lib/dsh-dragndrop-attachments.js
+    - lib/client.js

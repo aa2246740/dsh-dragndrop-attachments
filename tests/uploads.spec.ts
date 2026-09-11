@@ -6,12 +6,10 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { AttachmentCatalog } from '../src/catalog.js'
 import { apply as applyClient } from '../src/client/index.js'
 import type { AttachmentDockInjected } from '../src/client/AttachmentDock.js'
-import { registerAttachmentRpc } from '../src/rpc.js'
+import { createAttachmentRpcHandler } from '../src/rpc.js'
 import { UploadManager } from '../src/uploads.js'
-import { ATTACHMENT_RPC_CHANNEL, ENDPOINTS } from '../src/wire.js'
+import { ENDPOINTS } from '../src/wire.js'
 import { testContext } from './runtime.js'
-
-type Handler = (endpoint: string, payload: unknown) => Promise<unknown>
 
 const roots: string[] = []
 const managers: UploadManager[] = []
@@ -37,15 +35,7 @@ describe('upload slot lifecycle', () => {
     const catalog = await openCatalog()
     const uploads = await UploadManager.open(catalog)
     managers.push(uploads)
-    let handler: Handler | undefined
-    const context = {
-      connection: { rpc: { handle(channel: string, value: Handler) {
-        expect(channel).toBe(ATTACHMENT_RPC_CHANNEL)
-        handler = value
-      } } },
-    } as unknown as Context
-    registerAttachmentRpc(context, catalog, uploads)
-    if (handler === undefined) throw new Error('attachment RPC handler was not registered')
+    const handler = createAttachmentRpcHandler(catalog, uploads)
 
     const source = new TextEncoder().encode('真实上传字节\r\nline 2\nemoji: 🧪\n')
     const begun = unwrap<{ readonly uploadId: string }>(await handler(ENDPOINTS.uploadBegin, {

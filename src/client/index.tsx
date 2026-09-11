@@ -24,8 +24,8 @@ interface RpcConnection {
 }
 
 interface NativeConversation {
-  createDraftImages(files: readonly File[]): readonly ComposerAttachment[]
-  releaseDraftImages(attachments: readonly ComposerAttachment[]): void
+  createDrafts(sessionId: SessionId, files: readonly File[]): readonly ComposerAttachment[]
+  releaseDraftAttachments(attachments: readonly ComposerAttachment[]): void
 }
 
 const ATTACHMENT_MENU_LABEL = '文件和文件夹'
@@ -37,8 +37,8 @@ function rpcConnection(value: unknown): RpcConnection {
 }
 
 function nativeConversation(value: unknown): NativeConversation {
-  if (!isRecord(value) || typeof value.createDraftImages !== 'function' || typeof value.releaseDraftImages !== 'function') {
-    throw new Error('DSH 原生图片管线不可用。')
+  if (!isRecord(value) || typeof value.createDrafts !== 'function' || typeof value.releaseDraftAttachments !== 'function') {
+    throw new Error('DSH 原生附件管线不可用。')
   }
   return value as unknown as NativeConversation
 }
@@ -94,7 +94,7 @@ export function apply(ctx: ClientContext): void {
   ctx.inject(['commandUi'], (scope: ClientContext) => {
     scope.effect(() => scope.commandUi.register({
       name: '文件和文件夹',
-      description: ATTACHMENT_MENU_DETAIL,
+      description: () => ATTACHMENT_MENU_DETAIL,
       available: session => pickers.has(session.sessionId),
       ui: {
         kind: 'popupSelect',
@@ -208,9 +208,9 @@ export function apply(ctx: ClientContext): void {
           const prepared = []
           for (const file of files) prepared.push(await prepareImage(file))
           const conversation = nativeConversation(ctx.get('conversation'))
-          const attachments = conversation.createDraftImages(prepared.map(item => item.file))
+          const attachments = conversation.createDrafts(sessionId, prepared.map(item => item.file))
           if (!accept(attachments.map(item => item.id as DraftAttachmentId))) {
-            conversation.releaseDraftImages(attachments)
+            conversation.releaseDraftAttachments(attachments)
             throw new Error('当前输入框暂时不能接收图片。')
           }
           return prepared.map(item => ({

@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased
+
+- Lead the README with the official stock install for DeepSeek Harness 0.1.5-rc.2: `dsh plugin --profile web add github:aa2246740/dsh-dragndrop-attachments`, then restart the Host and reload. Document that `dsh plugin` runs **pnpm**. The git spec works from committed `lib/` plus `dsh.bundle.patch`; there is no `prepare` and no `allowBuilds` step.
+
 ## 1.2.1 - 2026-08-25
 
 - Preserved every simultaneous or sequential file selection as its own attachment card and model-context entry, while retaining content-addressed byte deduplication underneath.

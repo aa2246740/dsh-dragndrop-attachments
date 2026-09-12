@@ -2,7 +2,7 @@
 
 ## 1. 安装
 
-不需要 dshx。默认走官方 `dsh`：
+默认走官方 `dsh`，并需要 **pnpm** 在 `PATH` 上：
 
 ```sh
 dsh plugin --profile web add github:aa2246740/dsh-dragndrop-attachments

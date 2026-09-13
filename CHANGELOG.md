@@ -5,7 +5,7 @@ All notable changes to this project are documented here.
 ## Unreleased
 
 - Lead the README with the official stock install for DeepSeek Harness 0.1.5-rc.2: `dsh plugin --profile web add github:aa2246740/dsh-dragndrop-attachments`, then restart the Host and reload. Document that `dsh plugin` runs **pnpm**. The git spec works from committed `lib/` plus `dsh.bundle.patch`; there is no `prepare` and no `allowBuilds` step.
-- Declare `fast-xml-parser` as a real dependency so official `dsh plugin add` installs it. The committed Host `lib/` still imports it by name; leaving it as a peer crashed a stock 0.1.5-rc.2 Host.
+- Declare `fast-xml-parser`, `fflate`, `saxes`, and `sharp` as real dependencies so official `dsh plugin add` installs them. The committed Host `lib/` still imports them by name; leaving them as peers crashed a stock 0.1.5-rc.2 Host (`fast-xml-parser` first).
 
 ## 1.2.1 - 2026-08-25
 

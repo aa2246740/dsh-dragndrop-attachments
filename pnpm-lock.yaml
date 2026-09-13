@@ -11,6 +11,15 @@ importers:
       fast-xml-parser:
         specifier: 5.3.1
         version: 5.3.1
+      fflate:
+        specifier: 0.8.2
+        version: 0.8.2
+      saxes:
+        specifier: 6.0.0
+        version: 6.0.0
+      sharp:
+        specifier: 0.35.3
+        version: 0.35.3(@types/node@22.20.0)
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.2
@@ -87,21 +96,12 @@ importers:
       '@types/react-dom':
         specifier: ~18.3.0
         version: 18.3.7(@types/react@18.3.31)
-      fflate:
-        specifier: 0.8.2
-        version: 0.8.2
       react:
         specifier: 18.2.0
         version: 18.2.0
       react-dom:
         specifier: 18.2.0
         version: 18.2.0(react@18.2.0)
-      saxes:
-        specifier: 6.0.0
-        version: 6.0.0
-      sharp:
-        specifier: 0.35.3
-        version: 0.35.3(@types/node@22.20.0)
       tsdown:
         specifier: 0.22.2
         version: 0.22.2(typescript@6.0.3)

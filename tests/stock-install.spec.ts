@@ -34,16 +34,27 @@ describe('stock DSH 0.1.5-rc.2 install contract', () => {
     expect(manifest.scripts?.postinstall).toBeUndefined()
   })
 
-  it('ships fast-xml-parser as a real dependency, not a Host peer', () => {
-    expect(manifest.dependencies?.['fast-xml-parser']).toBe('5.3.1')
-    expect(manifest.peerDependencies?.['fast-xml-parser']).toBeUndefined()
-    expect(manifest.devDependencies?.['fast-xml-parser']).toBeUndefined()
+  it('ships Host-lib third-party imports as real dependencies, not Host peers', () => {
+    const pins = {
+      'fast-xml-parser': '5.3.1',
+      fflate: '0.8.2',
+      saxes: '6.0.0',
+      sharp: '0.35.3',
+    } as const
+    for (const [name, version] of Object.entries(pins)) {
+      expect(manifest.dependencies?.[name]).toBe(version)
+      expect(manifest.peerDependencies?.[name]).toBeUndefined()
+      expect(manifest.devDependencies?.[name]).toBeUndefined()
+    }
     const lockfile = readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8')
     expect(lockfile).toContain(
-      '    dependencies:\n      fast-xml-parser:\n        specifier: 5.3.1\n        version: 5.3.1',
+      '    dependencies:\n      fast-xml-parser:\n        specifier: 5.3.1\n        version: 5.3.1\n      fflate:\n        specifier: 0.8.2\n        version: 0.8.2\n      saxes:\n        specifier: 6.0.0\n        version: 6.0.0\n      sharp:\n        specifier: 0.35.3\n        version: 0.35.3',
     )
     const hostLib = readFileSync(join(root, 'lib/dsh-dragndrop-attachments.js'), 'utf8')
     expect(hostLib).toMatch(/from ["']fast-xml-parser["']/)
+    expect(hostLib).toMatch(/from ["']fflate["']/)
+    expect(hostLib).toMatch(/from ["']saxes["']/)
+    expect(hostLib).toMatch(/from ["']sharp["']/)
   })
 
   it('leads the README with the official one-liner, restart, and pnpm', () => {

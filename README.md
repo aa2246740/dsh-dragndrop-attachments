@@ -1,6 +1,22 @@
 # DSH DragNDrop Attachments
 
-DeepSeek Harness 0.1.2-rc.1 插件。把文件、Finder 文件夹、Office 文档和 ZIP 拖进会话，在本机建索引，再给模型工具去读指定行、区间、幻灯片、备注或压缩包条目。
+```sh
+dsh plugin --profile web add github:aa2246740/dsh-dragndrop-attachments
+```
+
+需要官方 DeepSeek Harness **0.1.5-rc.2**（`dsh` 或 `npx @deepseek-ai/dsh`）。`dsh plugin` 在 `$DSH_HOME/profiles/web` 里跑 **pnpm**，所以 pnpm 必须在 `PATH` 上。装完后重启这个 Host，再刷新页面。这条命令只写 profile，不会热挂正在跑的进程。
+
+仓库已提交编好的 `lib/`，`package.json` 声明了 `dsh.bundle.patch`。`github:` 安装因此不跑 `prepare`，也不需要给 pnpm ≥10 开 `allowBuilds`。
+
+`dsh` 不在 PATH 时：
+
+```sh
+npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-dragndrop-attachments
+```
+
+DSH.app 的 `desktop` profile 不能吃 `github:`；请用 `dsh web` 装进 `web` profile。
+
+把文件、Finder 文件夹、Office 文档和 ZIP 拖进会话，在本机建索引，再给模型工具去读指定行、区间、幻灯片、备注或压缩包条目。
 
 ![架构图](docs/assets/dsh-dragndrop-architecture.png)
 
@@ -10,20 +26,14 @@ DeepSeek Harness 0.1.2-rc.1 插件。把文件、Finder 文件夹、Office 文�
 
 详细使用见 [USER_GUIDE.zh-CN.md](USER_GUIDE.zh-CN.md)。
 
-## 安装
-
-```sh
-dsh plugin --profile web add github:aa2246740/dsh-dragndrop-attachments
-```
-
-或本地 clone：
+本机已有 clone 时：
 
 ```sh
 git clone https://github.com/aa2246740/dsh-dragndrop-attachments.git
 dsh plugin --profile web add ./dsh-dragndrop-attachments
 ```
 
-然后重启这个 DSH Host，刷新页面。
+然后同样重启这个 Host，再刷新页面。
 
 ```sh
 dsh plugin --profile web remove dsh-dragndrop-attachments

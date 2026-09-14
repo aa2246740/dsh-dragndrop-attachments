@@ -2,7 +2,7 @@ import type { AttachmentRecord } from './domain.js'
 
 export const ATTACHMENT_RPC_CHANNEL = '/dsh-dragndrop-attachments'
 /** Bump whenever a mixed client/server pair could silently lose attachment state. */
-export const RPC_PROTOCOL_VERSION = 2 as const
+export const RPC_PROTOCOL_VERSION = 3 as const
 export const ENDPOINTS = {
   list: 'attachments/list',
   remove: 'attachments/remove',

@@ -7,6 +7,8 @@ hotReload:
   artifacts:
     - src/dsh-dragndrop-attachments.ts
     - src/rpc.ts
+    - src/uploads.ts
+    - src/wire.ts
     - src/turn-context.ts
     - lib/dsh-dragndrop-attachments.js
     - lib/client.js

@@ -81,11 +81,11 @@ describe('upload slot lifecycle', () => {
       kind: 'text', mediaType: 'text/plain', bytes: 3, sha256: '0'.repeat(64), status: 'READY', pending: true,
       committed: false, createdAt: new Date(0).toISOString(), preview: 'abc', warnings: [], ref: {},
     }
+    const previousFetch = globalThis.fetch
     const connection = { rpc: { call: async (_channel: string, endpoint: string, payload: unknown): Promise<unknown> => {
       const request = payload as Record<string, unknown>
-      if (endpoint === ENDPOINTS.list) return { ok: true, value: { protocolVersion: 2, attachments: [] } }
+      if (endpoint === ENDPOINTS.list) return { ok: true, value: { protocolVersion: 3, attachments: [] } }
       if (endpoint === ENDPOINTS.uploadBegin) return { ok: true, value: { uploadId: `upload-${++nextUpload}`, chunkBytes: 10 } }
-      if (endpoint === ENDPOINTS.uploadChunk) return new Promise(resolve => { chunkResolvers.set(String(request.uploadId), resolve) })
       if (endpoint === ENDPOINTS.uploadCancel) {
         cancelled.push(String(request.uploadId))
         return { ok: true, value: { cancelled: true } }
@@ -93,6 +93,16 @@ describe('upload slot lifecycle', () => {
       if (endpoint === ENDPOINTS.uploadCommit) return { ok: true, value: record }
       throw new Error(`unexpected endpoint ${endpoint}`)
     } } }
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), 'http://dsh.internal')
+      const uploadId = url.searchParams.get('uploadId') ?? ''
+      const rpcId = new Headers(init?.headers).get('x-dsh-rpc-id') ?? 'upload-chunk'
+      const result = await new Promise<unknown>(resolve => { chunkResolvers.set(uploadId, resolve) })
+      return new Response(JSON.stringify({ type: 'server-response', rpcId, result }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }) as typeof fetch
     const context = {
       effect() {}, inject() {}, get: (name: string) => name === 'connection' ? connection : undefined,
       slots: {
@@ -100,29 +110,33 @@ describe('upload slot lifecycle', () => {
         register(value: { readonly inject: (sessionId: string) => AttachmentDockInjected }) { slot = value },
       },
     } as unknown as Context
-    applyClient(context)
-    if (slot === undefined) throw new Error('attachment slot was not registered')
-    const clientA = slot.inject('same-session')
-    const clientB = slot.inject('same-session')
-    const uploadA = clientA.upload({ kind: 'file', file: new File(['aaa'], 'a.txt') }, () => {})
-    const uploadB = clientB.upload({ kind: 'file', file: new File(['bbb'], 'b.txt') }, () => {})
-    for (let attempt = 0; attempt < 20 && chunkResolvers.size < 2; attempt += 1) await new Promise(resolve => setTimeout(resolve, 0))
-    expect([...chunkResolvers.keys()].sort()).toEqual(['upload-1', 'upload-2'])
+    try {
+      applyClient(context)
+      if (slot === undefined) throw new Error('attachment slot was not registered')
+      const clientA = slot.inject('same-session')
+      const clientB = slot.inject('same-session')
+      const uploadA = clientA.upload({ kind: 'file', file: new File(['aaa'], 'a.txt') }, () => {})
+      const uploadB = clientB.upload({ kind: 'file', file: new File(['bbb'], 'b.txt') }, () => {})
+      for (let attempt = 0; attempt < 20 && chunkResolvers.size < 2; attempt += 1) await new Promise(resolve => setTimeout(resolve, 0))
+      expect([...chunkResolvers.keys()].sort()).toEqual(['upload-1', 'upload-2'])
 
-    await clientA.releaseUploads()
-    expect(cancelled).toEqual(['upload-1'])
-    // A remounted dock reuses its cached injection; old work must stay cancelled.
-    clientA.activateUploads()
-    const afterRemount = clientA.upload({ kind: 'file', file: new File(['ccc'], 'after-paste.txt') }, () => {})
-    for (let attempt = 0; attempt < 20 && !chunkResolvers.has('upload-3'); attempt += 1) await new Promise(resolve => setTimeout(resolve, 0))
-    expect(chunkResolvers.has('upload-3')).toBe(true)
-    chunkResolvers.get('upload-3')?.({ ok: true, value: { receivedBytes: 3 } })
-    await expect(afterRemount).resolves.toMatchObject({ attachmentId: 'record-1' })
-    chunkResolvers.get('upload-1')?.({ ok: true, value: { receivedBytes: 3 } })
-    chunkResolvers.get('upload-2')?.({ ok: true, value: { receivedBytes: 3 } })
-    await expect(uploadA).rejects.toThrow('附件上传已取消')
-    await expect(uploadB).resolves.toMatchObject({ attachmentId: 'record-1' })
-    expect(cancelled.every(uploadId => uploadId === 'upload-1')).toBe(true)
+      await clientA.releaseUploads()
+      expect(cancelled).toEqual(['upload-1'])
+      // A remounted dock reuses its cached injection; old work must stay cancelled.
+      clientA.activateUploads()
+      const afterRemount = clientA.upload({ kind: 'file', file: new File(['ccc'], 'after-paste.txt') }, () => {})
+      for (let attempt = 0; attempt < 20 && !chunkResolvers.has('upload-3'); attempt += 1) await new Promise(resolve => setTimeout(resolve, 0))
+      expect(chunkResolvers.has('upload-3')).toBe(true)
+      chunkResolvers.get('upload-3')?.({ ok: true, value: { receivedBytes: 3 } })
+      await expect(afterRemount).resolves.toMatchObject({ attachmentId: 'record-1' })
+      chunkResolvers.get('upload-1')?.({ ok: true, value: { receivedBytes: 3 } })
+      chunkResolvers.get('upload-2')?.({ ok: true, value: { receivedBytes: 3 } })
+      await expect(uploadA).rejects.toThrow('附件上传已取消')
+      await expect(uploadB).resolves.toMatchObject({ attachmentId: 'record-1' })
+      expect(cancelled.every(uploadId => uploadId === 'upload-1')).toBe(true)
+    } finally {
+      globalThis.fetch = previousFetch
+    }
   })
 
   it('reclaims an idle slot before enforcing the global concurrency limit', async () => {

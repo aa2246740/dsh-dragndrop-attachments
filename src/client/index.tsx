@@ -80,12 +80,38 @@ function parseRecord(value: unknown): AttachmentRecord {
   return value as unknown as AttachmentRecord
 }
 
-function bytesToBase64(data: Uint8Array): string {
-  let binary = ''
-  for (let offset = 0; offset < data.length; offset += 0x8000) {
-    binary += String.fromCharCode(...data.subarray(offset, offset + 0x8000))
+function chunkRequestUrl(sessionId: string, uploadId: string, index: number): string {
+  const origin = globalThis.location?.origin ?? 'http://dsh.internal'
+  const url = new URL(`${ATTACHMENT_RPC_CHANNEL}/${ENDPOINTS.uploadChunk}`, origin)
+  url.searchParams.set('sessionId', sessionId)
+  url.searchParams.set('uploadId', uploadId)
+  url.searchParams.set('index', String(index))
+  return url.href
+}
+
+async function postBinaryChunk(sessionId: string, uploadId: string, index: number, chunk: Uint8Array): Promise<unknown> {
+  const rpcId = crypto.randomUUID()
+  const response = await fetch(chunkRequestUrl(sessionId, uploadId, index), {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/octet-stream',
+      'x-dsh-rpc-id': rpcId,
+    },
+    body: new Blob([new Uint8Array(chunk)]),
+    credentials: 'same-origin',
+  })
+  if (!response.ok) throw new Error(`transport failure for ${ATTACHMENT_RPC_CHANNEL}/${ENDPOINTS.uploadChunk}: HTTP ${response.status}`)
+  const full: unknown = await response.json()
+  if (!isRecord(full) || full.type !== 'server-response' || full.rpcId !== rpcId || !isRecord(full.result)) {
+    throw new Error('附件分块响应无效。')
   }
-  return btoa(binary)
+  const result = full.result
+  if (result.ok === true) return result.value
+  if (result.ok === false && isRecord(result.error) && typeof result.error.message === 'string') {
+    const action = typeof result.error.action === 'string' ? ` ${result.error.action}` : ''
+    throw new Error(`${result.error.message}${action}`)
+  }
+  throw new Error('附件分块响应无效。')
 }
 
 export function apply(ctx: ClientContext): void {
@@ -171,7 +197,7 @@ export function apply(ctx: ClientContext): void {
               const chunk = file === undefined
                 ? bytes!.slice(offset, Math.min(total, offset + begun.chunkBytes))
                 : new Uint8Array(await file.slice(offset, Math.min(total, offset + begun.chunkBytes)).arrayBuffer())
-              await call(ENDPOINTS.uploadChunk, { uploadId, index, data: bytesToBase64(chunk) })
+              await postBinaryChunk(sessionId, uploadId, index, chunk)
               if (!isCurrent()) throw new Error('附件上传已取消。')
               index += 1
               progress(Math.min(99, Math.round(Math.min(total, offset + chunk.byteLength) / total * 100)), '上传中')

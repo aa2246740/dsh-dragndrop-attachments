@@ -18,7 +18,8 @@ await page.evaluate(()=>{
 window.calls=[]; window.images=[];
 let slot, Component;
 const record={schemaVersion:'dsh-codex-attachment.v1',attachmentId:'test-id',name:'after-paste.txt',mediaType:'text/plain',kind:'text',bytes:3,preview:'abc',warnings:[],pending:true,status:'READY'};
-const connection={rpc:{call:async(channel,endpoint,payload)=>{calls.push(endpoint);return {ok:true,value:endpoint==='attachments/list'?{protocolVersion:2,attachments:[]}:endpoint==='upload/begin'?{uploadId:'u1',chunkBytes:100}:endpoint==='upload/commit'?record:{}};}}};
+const connection={rpc:{call:async(channel,endpoint,payload)=>{calls.push(endpoint);return {ok:true,value:endpoint==='attachments/list'?{protocolVersion:3,attachments:[]}:endpoint==='upload/begin'?{uploadId:'u1',chunkBytes:100}:endpoint==='upload/commit'?record:{}};}}};
+window.fetch=async(input,init)=>{calls.push('upload/chunk');const rpcId=new Headers(init?.headers).get('x-dsh-rpc-id')??'upload-chunk';return new Response(JSON.stringify({type:'server-response',rpcId,result:{ok:true,value:{receivedBytes:3}}}),{status:200,headers:{'content-type':'application/json'}});};
 const ctx={effect(){},inject(){},get(name){return name==='connection'?connection:{createDrafts(_sessionId,files){return files.map((file,i)=>({id:'image'+i}));},releaseDraftAttachments(){}};},slots:{inject(name,fn){fn();},register(options,comp){slot=options;Component=comp;}}};
 plugin.apply(ctx);
 const props=slot.inject('test-session');

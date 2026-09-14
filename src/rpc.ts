@@ -2,13 +2,15 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import { clientRequestSchema } from '@deepseek-ai/dsh-client-connection'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
-import { AttachmentPluginError, normalizedError } from './domain.js'
+import { AttachmentPluginError, normalizedError, UPLOAD_CHUNK_BYTES } from './domain.js'
 import type { AttachmentCatalog } from './catalog.js'
 import type { UploadManager } from './uploads.js'
 import { ATTACHMENT_RPC_CHANNEL, ENDPOINTS, isRecord, requiredInteger, requiredString, RPC_PROTOCOL_VERSION } from './wire.js'
 
 const ENDPOINT_SEGMENT = /^[A-Za-z0-9_$.-]+$/
-const MAX_RPC_BODY_BYTES = 1_048_576
+/** JSON control messages only. File bytes use `upload/chunk` as octet-stream. */
+export const MAX_RPC_BODY_BYTES = 1_048_576
+const BINARY_CHUNK_HEADER = 'x-dsh-rpc-id'
 
 function success<T>(value: T) {
   return { ok: true as const, value }
@@ -54,6 +56,56 @@ function writeRpc(res: ServerResponse, status: number, body: unknown): void {
     'content-length': Buffer.byteLength(text),
   })
   res.end(text)
+}
+
+async function readBoundedBody(req: IncomingMessage, maxBytes: number): Promise<Uint8Array | 'too-large'> {
+  const chunks: Buffer[] = []
+  let received = 0
+  for await (const chunk of req) {
+    const buffer = chunk as Buffer
+    received += buffer.byteLength
+    if (received > maxBytes) {
+      req.destroy()
+      return 'too-large'
+    }
+    chunks.push(buffer)
+  }
+  return new Uint8Array(Buffer.concat(chunks))
+}
+
+async function handleBinaryUploadChunk(req: IncomingMessage, res: ServerResponse, uploads: UploadManager, mediaType: string | undefined): Promise<void> {
+  if (mediaType !== 'application/octet-stream') {
+    writeRpc(res, 415, 'upload/chunk requires application/octet-stream')
+    return
+  }
+  const url = new URL(req.url ?? '', 'http://dsh.internal')
+  const rpcIdHeader = req.headers[BINARY_CHUNK_HEADER]
+  const rpcId = typeof rpcIdHeader === 'string' && rpcIdHeader !== '' ? rpcIdHeader : 'upload-chunk'
+  let sessionId: string
+  let uploadId: string
+  let index: number
+  try {
+    sessionId = requiredString(url.searchParams.get('sessionId'), 'sessionId')
+    uploadId = requiredString(url.searchParams.get('uploadId'), 'uploadId')
+    const rawIndex = url.searchParams.get('index')
+    if (rawIndex === null) throw new Error('index must be a non-negative integer')
+    index = requiredInteger(Number(rawIndex), 'index')
+  } catch {
+    writeRpc(res, 400, 'invalid upload/chunk query')
+    return
+  }
+  const body = await readBoundedBody(req, UPLOAD_CHUNK_BYTES)
+  if (body === 'too-large') {
+    res.writeHead(413, { connection: 'close' })
+    res.end()
+    return
+  }
+  try {
+    const value = await uploads.chunkBytes(sessionId, uploadId, index, body)
+    writeRpc(res, 200, { type: 'server-response', rpcId, result: success(value) })
+  } catch (error) {
+    writeRpc(res, 200, { type: 'server-response', rpcId, result: failure(error) })
+  }
 }
 
 /** Dispatch one attachment RPC after the HTTP envelope is validated. */
@@ -128,26 +180,23 @@ export function registerAttachmentRpc(ctx: Context, catalog: AttachmentCatalog, 
         return
       }
       const mediaType = req.headers['content-type']?.split(';', 1)[0]?.trim().toLowerCase()
+      if (endpoint === ENDPOINTS.uploadChunk) {
+        await handleBinaryUploadChunk(req, res, uploads, mediaType)
+        return
+      }
       if (mediaType !== 'application/json') {
         writeRpc(res, 415, 'content type must be application/json')
         return
       }
-      const chunks: Buffer[] = []
-      let received = 0
-      for await (const chunk of req) {
-        const buffer = chunk as Buffer
-        received += buffer.byteLength
-        if (received > MAX_RPC_BODY_BYTES) {
-          res.writeHead(413, { connection: 'close' })
-          res.end()
-          req.destroy()
-          return
-        }
-        chunks.push(buffer)
+      const raw = await readBoundedBody(req, MAX_RPC_BODY_BYTES)
+      if (raw === 'too-large') {
+        res.writeHead(413, { connection: 'close' })
+        res.end()
+        return
       }
       let body: unknown
       try {
-        body = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+        body = JSON.parse(Buffer.from(raw).toString('utf8'))
       } catch {
         writeRpc(res, 400, 'body is not JSON')
         return

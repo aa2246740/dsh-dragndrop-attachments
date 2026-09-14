@@ -144,10 +144,13 @@ export class UploadManager {
   }
 
   async chunk(sessionId: string, uploadId: string, index: number, encoded: string): Promise<{ readonly receivedBytes: number }> {
+    return this.chunkBytes(sessionId, uploadId, index, strictBase64(encoded))
+  }
+
+  async chunkBytes(sessionId: string, uploadId: string, index: number, bytes: Uint8Array): Promise<{ readonly receivedBytes: number }> {
     const state = this.require(sessionId, uploadId)
     if (state.busy) throw new AttachmentPluginError('同一附件的分块必须顺序上传。', 'BAD_REQUEST')
     if (!Number.isSafeInteger(index) || index !== state.expectedChunk) throw new AttachmentPluginError('附件分块顺序错误。', 'BAD_REQUEST')
-    const bytes = strictBase64(encoded)
     if (bytes.byteLength > UPLOAD_CHUNK_BYTES) throw new AttachmentPluginError('附件分块超过限制。', 'BAD_REQUEST')
     if (state.receivedBytes + bytes.byteLength > state.declaredBytes) throw new AttachmentPluginError('附件实际大小超过声明值。', 'BAD_REQUEST')
     state.busy = true

@@ -159,7 +159,7 @@ export function createAttachmentRpcHandler(catalog: AttachmentCatalog, uploads: 
 /**
  * Dedicated attachment RPC is mounted on this plugin fiber's webServer.
  * Connection.rpc.handle registers the same prefix on the Connection fiber,
- * which does not inject webServer in 0.1.5-rc.2. Unclaimed POSTs then hit the
+ * which does not inject webServer in 0.1.5-rc.3. Unclaimed POSTs then hit the
  * SPA fallback and return HTTP 405.
  */
 export function registerAttachmentRpc(ctx: Context, catalog: AttachmentCatalog, uploads: UploadManager): void {

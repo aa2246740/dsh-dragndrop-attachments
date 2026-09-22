@@ -4,7 +4,7 @@
 dsh plugin --profile web add github:aa2246740/dsh-dragndrop-attachments
 ```
 
-需要官方 DeepSeek Harness **0.1.5-rc.2**（`dsh` 或 `npx @deepseek-ai/dsh`）。`dsh plugin` 在 `$DSH_HOME/profiles/web` 里跑 **pnpm**，所以 pnpm 必须在 `PATH` 上。装完后重启这个 Host，再刷新页面。这条命令只写 profile，不会热挂正在跑的进程。
+需要官方 DeepSeek Harness **0.1.5-rc.3**（tag `dsh-v0.1.5-rc.3`，`dsh` 或 `npx @deepseek-ai/dsh@0.1.5-rc.3`）。`dsh plugin` 在 `$DSH_HOME/profiles/web` 里跑 **pnpm**，所以 pnpm 必须在 `PATH` 上。装完后重启这个 Host，再刷新页面。这条命令只写 profile，不会热挂正在跑的进程。
 
 仓库已提交编好的 `lib/`，`package.json` 声明了 `dsh.bundle.patch`。`github:` 安装因此不跑 `prepare`，也不需要给 pnpm ≥10 开 `allowBuilds`。
 

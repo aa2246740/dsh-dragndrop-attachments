@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-describe('stock DSH 0.1.5-rc.2 install contract', () => {
+describe('stock DSH 0.1.5-rc.3 install contract', () => {
   const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
     dsh?: { bundle?: { patch?: string }; client?: { entry?: string } }
     main?: string
@@ -32,6 +32,19 @@ describe('stock DSH 0.1.5-rc.2 install contract', () => {
     expect(manifest.scripts?.prepare).toBeUndefined()
     expect(manifest.scripts?.preinstall).toBeUndefined()
     expect(manifest.scripts?.postinstall).toBeUndefined()
+  })
+
+  it('peers official 0.1.5-rc.3 packages and does not target 0.1.7 alphas', () => {
+    const peers = Object.entries(manifest.peerDependencies ?? {}).filter(([name]) => name.startsWith('@deepseek-ai/dsh-'))
+    const devs = Object.entries(manifest.devDependencies ?? {}).filter(([name]) => name.startsWith('@deepseek-ai/dsh-'))
+    expect(peers.length).toBeGreaterThan(0)
+    expect(devs.length).toBeGreaterThan(0)
+    for (const [, version] of peers) expect(version).toBe('^0.1.5-rc.3')
+    for (const [, version] of devs) expect(version).toBe('0.1.5-rc.3')
+    expect(readme).toMatch(/0\.1\.5-rc\.3/)
+    expect(readme).toMatch(/@deepseek-ai\/dsh@0\.1\.5-rc\.3/)
+    expect(readme).not.toMatch(/0\.1\.7-alpha/)
+    expect(readme).not.toMatch(/0\.1\.2-rc\.1/)
   })
 
   it('ships Host-lib third-party imports as real dependencies, not Host peers', () => {

@@ -57,7 +57,7 @@ describe('current-turn attachment projection', () => {
     const user = createUserMessage({ content: [{ type: 'text', text: '看看有啥值得优化的地方' }], source: { kind: 'user' } })
     const runtime = createUserMessage({
       content: [{ type: 'text', text: 'Current workspace: /tmp/unrelated-project/migration-staging/dsh-image-container' }],
-      source: { kind: 'plugin', plugin: 'runtime' },
+      source: { kind: 'plugin:runtime' },
     })
     const listener = captureListener(catalog, 'session-context')
     const result = await listener(
@@ -71,8 +71,7 @@ describe('current-turn attachment projection', () => {
     expect(result.messages[2]).toBe(runtime)
     const context = result.messages[1]!
     expect(context.source).toEqual({
-      kind: 'plugin',
-      plugin: 'dsh-dragndrop-attachments',
+      kind: 'plugin:dsh-dragndrop-attachments',
       form: 'notice',
       summary: '📎 2 个附件：音频生成式能力演进时间轴.md、视频生成式能力演进时间轴-主流精简版.md',
     })
@@ -125,7 +124,7 @@ describe('current-turn attachment projection', () => {
     const catalog = await AttachmentCatalog.open(testContext(), { root: await root() })
     await catalog.ingest('session-history', 'history.md', new TextEncoder().encode('history'))
     const listener = captureListener(catalog, 'session-history')
-    const plugin = createUserMessage({ content: [{ type: 'text', text: 'tool continuation' }], source: { kind: 'plugin', plugin: 'tool' } })
+    const plugin = createUserMessage({ content: [{ type: 'text', text: 'tool continuation' }], source: { kind: 'plugin:tool' } })
     const result = await listener(
       { messages: [plugin], turn: 1, step: 2, signal: new AbortController().signal },
       async () => ({ kind: 'enter', messages: [plugin] }),

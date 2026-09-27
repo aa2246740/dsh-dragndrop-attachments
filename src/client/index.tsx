@@ -11,7 +11,6 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { AttachmentRecord } from '../domain.js'
 import { ATTACHMENT_RPC_CHANNEL, ENDPOINTS, hasCurrentRpcProtocol, isRecord, type RpcResult } from '../wire.js'
 import { AttachmentDock, type AttachmentDockInjected, type ClientUploadSource } from './AttachmentDock.js'
-import { prepareImage } from './image.js'
 
 export { AttachmentDock } from './AttachmentDock.js'
 export const name = 'dsh-dragndrop-attachments-client'
@@ -28,9 +27,6 @@ interface NativeConversation {
   releaseDraftAttachments(attachments: readonly ComposerAttachment[]): void
 }
 
-const ATTACHMENT_MENU_LABEL = '文件和文件夹'
-const ATTACHMENT_MENU_DETAIL = '添加图片、文档、ZIP 或整个文件夹'
-
 function rpcConnection(value: unknown): RpcConnection {
   if (!isRecord(value) || !isRecord(value.rpc) || typeof value.rpc.call !== 'function') throw new Error('附件连接不可用。')
   return value as unknown as RpcConnection
@@ -41,33 +37,6 @@ function nativeConversation(value: unknown): NativeConversation {
     throw new Error('DSH 原生附件管线不可用。')
   }
   return value as unknown as NativeConversation
-}
-
-/** Keep the attachment action at the top of DSH RC1's shared +/command list. */
-function bindAttachmentMenuPlacement(): () => void {
-  let queued = false
-  const promote = (): void => {
-    queued = false
-    for (const listbox of document.querySelectorAll<HTMLElement>('[role="listbox"]')) {
-      const options = [...listbox.querySelectorAll<HTMLElement>('[role="option"]')]
-      const attachment = options.find(option => {
-        const text = option.textContent ?? ''
-        return text.includes(ATTACHMENT_MENU_LABEL) && text.includes(ATTACHMENT_MENU_DETAIL)
-      })
-      const first = options[0]
-      if (attachment === undefined || first === undefined || attachment === first) continue
-      attachment.parentElement?.insertBefore(attachment, first)
-    }
-  }
-  const schedule = (): void => {
-    if (queued) return
-    queued = true
-    queueMicrotask(promote)
-  }
-  const observer = new MutationObserver(schedule)
-  observer.observe(document.body, { childList: true, subtree: true })
-  promote()
-  return () => { observer.disconnect() }
 }
 
 function parseRecord(value: unknown): AttachmentRecord {
@@ -116,15 +85,14 @@ async function postBinaryChunk(sessionId: string, uploadId: string, index: numbe
 
 export function apply(ctx: ClientContext): void {
   const pickers = new Map<SessionId, { readonly openFile: () => Promise<void>; readonly openFolder: () => Promise<void> }>()
-  ctx.effect(bindAttachmentMenuPlacement, 'dsh-dragndrop-attachments: pin native + menu entry')
   ctx.inject(['commandUi'], (scope: ClientContext) => {
     scope.effect(() => scope.commandUi.register({
-      name: '文件和文件夹',
-      description: () => ATTACHMENT_MENU_DETAIL,
-      available: session => pickers.has(session.sessionId),
+      name: '添加文件夹快照',
+      description: () => '在浏览器中上传整个文件夹，保留相对路径',
+      available: session => !('__DSH_HOST_PATHS__' in globalThis) && pickers.has(session.sessionId),
       ui: {
         kind: 'popupSelect',
-        options: async () => [{ id: 'file', label: '选择文件' }, { id: 'folder', label: '选择文件夹' }],
+        options: async () => [{ id: 'folder', label: '选择文件夹' }],
         onSelect: (option, session): void | Promise<void> => {
           if (option.id !== 'file' && option.id !== 'folder') throw new Error(`未知附件选择方式：${option.id}`)
           const picker = pickers.get(session.sessionId)
@@ -230,20 +198,13 @@ export function apply(ctx: ClientContext): void {
           pickers.set(sessionId, open)
           return () => { if (pickers.get(sessionId) === open) pickers.delete(sessionId) }
         },
-        attachNativeImages: async (files, accept) => {
-          const prepared = []
-          for (const file of files) prepared.push(await prepareImage(file))
+        attachNativeFiles: async (files, accept) => {
           const conversation = nativeConversation(ctx.get('conversation'))
-          const attachments = conversation.createDrafts(sessionId, prepared.map(item => item.file))
+          const attachments = conversation.createDrafts(sessionId, files)
           if (!accept(attachments.map(item => item.id as DraftAttachmentId))) {
             conversation.releaseDraftAttachments(attachments)
-            throw new Error('当前输入框暂时不能接收图片。')
+            throw new Error('当前输入框暂时不能接收文件。')
           }
-          return prepared.map(item => ({
-            name: item.file.name, resized: item.resized,
-            source: `${item.source.width}×${item.source.height}`,
-            output: `${item.output.width}×${item.output.height}`,
-          }))
         },
       }
     },

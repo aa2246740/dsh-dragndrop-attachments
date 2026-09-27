@@ -29,7 +29,8 @@ try {
   await chmod(join(extracted, 'package/vendor/officecli/darwin-arm64/officecli'), 0o755)
 
   const target = join(outputDir, `dsh-dragndrop-attachments-${manifest.version}.tgz`)
-  run('tar', ['-czf', target, '-C', extracted, 'package'])
+  // Do not publish macOS AppleDouble metadata alongside the plugin files.
+  run('tar', ['-czf', target, '-C', extracted, 'package'], { env: { ...process.env, COPYFILE_DISABLE: '1' } })
   const hash = createHash('sha256').update(await readFile(target)).digest('hex')
   process.stdout.write(`${JSON.stringify({ status: 'RELEASE_BUILT', archive: target, sha256: hash }, null, 2)}\n`)
 } finally {

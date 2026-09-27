@@ -1,56 +1,37 @@
 import { collectDroppedItems, snapshotDroppedItems, type IntakeItem } from './folders.js'
 
+/** Only Web folder drops need a fallback. Files, paste and all desktop drops stay native. */
 export function bindFileIntake(
   documentTarget: EventTarget,
   windowTarget: EventTarget,
   onItems: (items: readonly IntakeItem[]) => void | Promise<void>,
   onDragActive: (active: boolean) => void,
   onError: (error: unknown) => void,
+  options: { readonly desktop?: boolean; readonly canAccept?: () => boolean } = {},
 ): () => void {
-  let dragDepth = 0
-  let intakeChain = Promise.resolve()
-  const enqueue = (work: () => Promise<void>): void => { intakeChain = intakeChain.then(work).catch(onError) }
-  const fileTransfer = (event: Event): DataTransfer | null => {
-    const transfer = (event as DragEvent).dataTransfer
-    return transfer !== null && transfer !== undefined && Array.from(transfer.types).includes('Files') ? transfer : null
-  }
-  const reset = (): void => { dragDepth = 0; onDragActive(false) }
-  const enter = (event: Event): void => {
-    if (fileTransfer(event) === null) return
-    event.preventDefault(); event.stopImmediatePropagation(); dragDepth += 1; onDragActive(true)
-  }
-  const over = (event: Event): void => {
-    const transfer = fileTransfer(event); if (transfer === null) return
-    event.preventDefault(); event.stopImmediatePropagation(); transfer.dropEffect = 'copy'; onDragActive(true)
-  }
-  const leave = (event: Event): void => {
-    if (fileTransfer(event) === null) return
-    event.preventDefault(); event.stopImmediatePropagation(); dragDepth = Math.max(0, dragDepth - 1)
-    if (dragDepth === 0) onDragActive(false)
-  }
+  if (options.desktop) return () => {}
+  let disposed = false
+  let chain = Promise.resolve()
   const drop = (event: Event): void => {
-    const transfer = fileTransfer(event); if (transfer === null) return
+    const transfer = (event as DragEvent).dataTransfer
+    if (!transfer) return
+    const hasFolder = Array.from(transfer.items ?? []).some(item => {
+      try { return item.kind === 'file' && typeof item.webkitGetAsEntry === 'function' && item.webkitGetAsEntry()?.isDirectory === true }
+      catch { return false }
+    })
+    if (!hasFolder) return
     const snapshot = snapshotDroppedItems(transfer)
-    event.preventDefault(); event.stopImmediatePropagation(); reset(); enqueue(async () => { await onItems(await collectDroppedItems(snapshot)) })
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    // Native drop will not run for this event. Clear its hover overlay.
+    windowTarget.dispatchEvent(new Event('dragend'))
+    onDragActive(false)
+    if (options.canAccept?.() === false) { onError(new Error('当前输入框暂时不能接收文件夹。')); return }
+    chain = chain.then(async () => {
+      const items = await collectDroppedItems(snapshot)
+      if (!disposed) await onItems(items)
+    }).catch(onError)
   }
-  const paste = (event: Event): void => {
-    const files = Array.from((event as ClipboardEvent).clipboardData?.files ?? [])
-    if (files.length === 0) return
-    event.preventDefault(); event.stopImmediatePropagation(); enqueue(async () => { await onItems(files.map(file => ({ kind: 'file', file }))) })
-  }
-
-  documentTarget.addEventListener('dragenter', enter, true)
-  documentTarget.addEventListener('dragover', over, true)
-  documentTarget.addEventListener('dragleave', leave, true)
   documentTarget.addEventListener('drop', drop, true)
-  documentTarget.addEventListener('paste', paste, true)
-  windowTarget.addEventListener('dragend', reset)
-  return () => {
-    documentTarget.removeEventListener('dragenter', enter, true)
-    documentTarget.removeEventListener('dragover', over, true)
-    documentTarget.removeEventListener('dragleave', leave, true)
-    documentTarget.removeEventListener('drop', drop, true)
-    documentTarget.removeEventListener('paste', paste, true)
-    windowTarget.removeEventListener('dragend', reset)
-  }
+  return () => { disposed = true; documentTarget.removeEventListener('drop', drop, true) }
 }

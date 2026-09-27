@@ -71,7 +71,7 @@ describe('attachment-first routing', () => {
     expect(attachmentDiscoveryDenial('bash', { command: 'find /tmp -path "*/attachments/*"' }, records))
       .toContain('read_attachment')
     expect(attachmentDiscoveryDenial('read_file', { path: '/project/音频生成式能力演进时间轴.md' }, records))
-      .toContain('not workspace paths')
+      .toBeUndefined() // Same-named native/workspace files are not legacy snapshot identities.
     expect(attachmentDiscoveryDenial('bash', { command: 'rg -n TODO src tests' }, records)).toBeUndefined()
     expect(attachmentDiscoveryDenial('read_attachment', { attachment_id: 'attachment:one' }, records)).toBeUndefined()
   })

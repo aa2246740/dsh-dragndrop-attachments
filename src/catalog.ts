@@ -40,7 +40,7 @@ const DOCUMENT_MEDIA = Object.freeze([
   'text/csv',
 ])
 
-const DOCUMENT_LIMITS = Object.freeze({
+export const DOCUMENT_LIMITS = Object.freeze({
   maxDocumentBytes: MAX_FILE_BYTES,
   maxDocumentsPerMessage: MAX_SESSION_FILES,
   maxMessageDocumentBytes: MAX_SESSION_BYTES,

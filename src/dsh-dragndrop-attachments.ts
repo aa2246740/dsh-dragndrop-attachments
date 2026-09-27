@@ -9,6 +9,7 @@ import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
+import { NativeDocumentReader, registerNativeDocumentReader } from './native-reader.js'
 import { AttachmentCatalog } from './catalog.js'
 import { registerAttachmentRpc } from './rpc.js'
 import { registerAttachmentTools } from './tools.js'
@@ -55,10 +56,13 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   })
   registerAttachmentRpc(ctx, catalog, uploads)
 
+  const nativeReader = new NativeDocumentReader(ctx, resolve(dataRoot), config.officeCliPath?.trim() || undefined)
   const fibers = new Map<Agent, ReturnType<Context['inject']>>()
   const install = (agent: Agent): void => {
-    if (agent.session.header.origin === 'subagent' || fibers.has(agent)) return
-    fibers.set(agent, agent.ctx.inject(['tools', 'systemPrompt'], scope => {
+    if (fibers.has(agent)) return
+    fibers.set(agent, agent.ctx.inject(['tools', 'systemPrompt', 'fs'], scope => {
+      registerNativeDocumentReader(scope, nativeReader)
+      if (agent.session.header.origin === 'subagent') return
       const turnState = new AttachmentTurnState()
       registerAttachmentTools(scope, catalog, agent.session.id, turnState)
       registerAttachmentTurnContext(scope, catalog, agent.session.id, turnState)

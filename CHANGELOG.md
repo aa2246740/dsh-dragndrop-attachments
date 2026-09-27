@@ -1,3 +1,11 @@
+# 1.3.0 — 2026-09-27
+
+- 正式支持官方 DSH 0.1.7-rc.2，提交预构建 Bundle，使用官方插件安装入口。
+- 原生接管普通文件拖放、粘贴和桌面目录；仅 Web 文件夹使用快照补充入口。
+- 通过官方 tools/execute 在 read 前分流 DOCX/XLSX/PPTX/CSV/ZIP；新增按路径的 read_document_file 查询。
+- 保留权限拒绝、取消、真实解析错误和覆盖范围；不修改官方源码，不产生预期的中间读取错误。
+- 保留旧附件身份和读取工具；修复旧附件同名判断误拦原生文件读取。
+
 # Changelog
 
 All notable changes to this project are documented here.

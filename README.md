@@ -1,55 +1,60 @@
-# DSH DragNDrop Attachments
+# DSH Drag & Drop Attachments
+
+为官方 **DeepSeek Harness 0.1.7-rc.2** 增强文档读取。照常拖文件、粘贴或使用原生附件按钮；图片、文本和 PDF 沿用原生处理，DOCX、XLSX、PPTX、CSV 和 ZIP 自动接入本地解析。无需选择“增强导入”，不修改官方源码。
+
+## 安装
+
+### Web UI
 
 ```sh
 dsh plugin --profile web add github:aa2246740/dsh-dragndrop-attachments
 ```
 
-需要官方 DeepSeek Harness **0.1.5-rc.3**（tag `dsh-v0.1.5-rc.3`，`dsh` 或 `npx @deepseek-ai/dsh@0.1.5-rc.3`）。`dsh plugin` 在 `$DSH_HOME/profiles/web` 里跑 **pnpm**，所以 pnpm 必须在 `PATH` 上。装完后重启这个 Host，再刷新页面。这条命令只写 profile，不会热挂正在跑的进程。
+需要官方 `dsh`（也可用 `npx @deepseek-ai/dsh@0.1.7-rc.2`）和 PATH 中的 **pnpm**。等当前任务完成后重启这个 Host，再刷新页面。仓库 main 已包含构建好的 `lib/`，安装不需要编译插件或额外开发工具。
 
-仓库已提交编好的 `lib/`，`package.json` 声明了 `dsh.bundle.patch`。`github:` 安装因此不跑 `prepare`，也不需要给 pnpm ≥10 开 `allowBuilds`。
+### 官方桌面端 / DSH Studio
 
-`dsh` 不在 PATH 时：
+打开 **设置 → 插件 → 添加插件**，在“包名或地址”中填入：
 
-```sh
-npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-dragndrop-attachments
+```text
+github:aa2246740/dsh-dragndrop-attachments
 ```
 
-DSH.app 的 `desktop` profile 不能吃 `github:`；请用 `dsh web` 装进 `web` profile。
+也可以从 [最新 Release](https://github.com/aa2246740/dsh-dragndrop-attachments/releases/latest) 下载 `.tgz`，填入该文件的绝对路径。安装后按官方界面提示，等任务完成再退出并重开应用。桌面端使用 `desktop` profile，Web UI 使用 `web` profile；请安装到实际使用的那一端。
 
-把文件、Finder 文件夹、Office 文档和 ZIP 拖进会话，在本机建索引，再给模型工具去读指定行、区间、幻灯片、备注或压缩包条目。
+## 怎么用
 
-![架构图](docs/assets/dsh-dragndrop-architecture.png)
+- **文件**：照常拖放、粘贴或用原生附件按钮。桌面端保留原生本地路径引用；Web UI 保留原生上传和会话附件。
+- **Word / Excel / PowerPoint / CSV**：Agent 调用 `read` 时自动得到结构目录、预览和定位信息，再按需读表格、公式、幻灯片、备注或文档段落。
+- **ZIP**：先列目录，再按条目路径读取文本或代码；不在工作区解压，不自动展开嵌套压缩包。
+- **桌面文件夹**：沿用官方目录引用，里面的 Office 文件按路径读取时自动增强。
+- **浏览器文件夹**：拖入时自动保存文件夹快照；也可用 `+` 菜单里的“添加文件夹快照”。混合拖入的普通文件仍进入原生附件。文件夹卡片会说明快照内容。
+- **历史附件**：1.2.x 上传的附件和文件夹快照继续可读，无需迁移。
 
-图片预处理改编自 [OpenAI Codex 的 prompt-image 逻辑](https://github.com/openai/codex/tree/main/codex-rs/utils/image)，Rust 译成 TypeScript 后接到 DSH 原生图片附件。
+已有原生拖放和粘贴不会被插件整体拦截，也不会同时上传两份。插件用官方 `tools/execute` 接口在支持的文档读取前分流，不依靠先触发一次工具错误。损坏、加密、超限或确实不支持的内容仍会返回真实错误，不伪装成功。
 
-可拖 PNG、JPEG、WebP、GIF、DOCX、XLSX、PPTX、CSV、常见文本和代码、ZIP、Finder 文件夹。模型用 `list_attachments` / `read_attachment` 按 `attachment_id` 读，不要用 bash 去磁盘猜附件位置。
+## 支持范围
 
-详细使用见 [USER_GUIDE.zh-CN.md](USER_GUIDE.zh-CN.md)。
+Office 随包固定 **OfficeCLI 1.0.144（macOS Apple Silicon）**。当前完整 Office 解析仅承诺该平台。DOC/XLS/PPT 旧格式、OCR、公式重算和复杂图表视觉理解不在承诺范围；PDF 和图片能力由官方 DSH 提供。
 
-本机已有 clone 时：
+单个增强读取文件最大 50 MiB；展开 ZIP 最大 256 MiB。读取窗口和查询输出有上限，大文件需要分段查询。结果会保留覆盖范围、警告及原始定位符；输出行号是解析结果行号，不能当作 Office 文件的编辑行号。
 
-```sh
-git clone https://github.com/aa2246740/dsh-dragndrop-attachments.git
-dsh plugin --profile web add ./dsh-dragndrop-attachments
-```
+插件通过当前会话的文件系统读取，保留权限和取消检查。文件内容始终作为不可信用户数据。解析缓存位于 `$DSH_HOME/dragndrop-attachments/v1/native-cache`；原生附件及会话仍由 DSH 管理。旧插件快照保留在同一数据目录，早期 `codex-attachments/v1` 数据仍兼容。
 
-然后同样重启这个 Host，再刷新页面。
+## 更新和卸载
+
+在原来的安装入口再次安装最新包，然后按官方提示重新打开应用。安装成功和运行中加载新版是两步。
+
+Web 卸载：
 
 ```sh
 dsh plugin --profile web remove dsh-dragndrop-attachments
 ```
 
-## 本机数据
+桌面端在设置的插件页面禁用或卸载。禁用后普通拖放仍由原生处理；解析增强、Web 文件夹快照入口和旧附件读取工具停用。卸载不主动删除历史数据。
 
-非图片附件在 `~/.dsh/dragndrop-attachments/v1`。浏览器拖放不会把 Finder 原始绝对路径暴露给网页。模型只看到 `attachment_id`。附件正文标成不可信用户数据。若本机还有早期预览版 `~/.dsh/codex-attachments/v1`，会继续用它。
-
-Office 随包固定 OfficeCLI 1.0.144（macOS arm64），校验见 `vendor/officecli/manifest.json`。
+[使用指南](USER_GUIDE.zh-CN.md) · [更新记录](CHANGELOG.md) · [第三方许可](THIRD_PARTY_NOTICES.md)
 
 ## 开发
 
-```sh
-pnpm install --ignore-workspace --frozen-lockfile
-pnpm check
-```
-
-第三方许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+Node.js 22.19+ / 24+，pnpm。`pnpm install --ignore-workspace --frozen-lockfile` 安装依赖；`pnpm test` 和 `pnpm typecheck` 验证源码。发布包已经构建，普通安装无需执行开发命令。

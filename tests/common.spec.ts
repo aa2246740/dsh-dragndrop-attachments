@@ -97,14 +97,14 @@ describe('common attachment walking skeleton', () => {
     expect(source).toContain('void refresh()')
   })
 
-  it('registers a native file-or-folder menu without a Dock chooser and keeps client artifacts marker-free', async () => {
+  it('offers a Web folder fallback without replacing the native file menu', async () => {
     const clientRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
     const indexSource = await readFile(join(clientRoot, 'src/client/index.tsx'), 'utf8')
     const dockSource = await readFile(join(clientRoot, 'src/client/AttachmentDock.tsx'), 'utf8')
     const builtSource = await readFile(join(clientRoot, 'lib/client.js'), 'utf8')
-    expect(indexSource).toContain("{ id: 'file', label: '选择文件' }")
+    expect(indexSource).not.toContain("name: '文件和文件夹'")
     expect(indexSource).toContain("{ id: 'folder', label: '选择文件夹' }")
-    expect(indexSource).toContain("'添加图片、文档、ZIP 或整个文件夹'")
+    expect(indexSource).toContain("'添加文件夹快照'")
     expect(dockSource).not.toMatch(/chooser|popupSelect/iu)
     for (const source of [indexSource, dockSource, builtSource]) expect(source).not.toMatch(/appendMarker|removeMarker|setDraft|📎/u)
   })
@@ -216,7 +216,7 @@ describe('common attachment walking skeleton', () => {
     expect(await readdir(uploadRoot)).toEqual(['keep-me.part'])
   })
 
-  it('captures file drag-and-drop and paste before the image-only host handler', () => {
+  it('leaves normal file drops and paste to the official handler', () => {
     const documentTarget = new EventTarget()
     const windowTarget = new EventTarget()
     const received: string[][] = []
@@ -225,7 +225,7 @@ describe('common attachment walking skeleton', () => {
     const markdown = { name: '说明.md' } as File
     const event = (type: string, field: 'dataTransfer' | 'clipboardData', files: readonly File[]) => {
       const value = new Event(type, { cancelable: true })
-      Object.defineProperty(value, field, { value: { types: ['Files'], files, dropEffect: 'none' } })
+      Object.defineProperty(value, field, { value: { types: ['Files'], files, items: [], dropEffect: 'none' } })
       return value
     }
     const dispose = bindFileIntake(documentTarget, windowTarget, items => { received.push(items.map(item => item.kind === 'file' ? item.file.name : item.name)) }, value => { active.push(value) }, error => { throw error })
@@ -237,12 +237,12 @@ describe('common attachment walking skeleton', () => {
     const paste = event('paste', 'clipboardData', [markdown])
     documentTarget.dispatchEvent(paste)
 
-    expect(enter.defaultPrevented).toBe(true)
-    expect(drop.defaultPrevented).toBe(true)
-    expect(paste.defaultPrevented).toBe(true)
-    expect(active).toEqual([true, false])
+    expect(enter.defaultPrevented).toBe(false)
+    expect(drop.defaultPrevented).toBe(false)
+    expect(paste.defaultPrevented).toBe(false)
+    expect(active).toEqual([])
     return new Promise(resolve => setTimeout(resolve, 0)).then(() => {
-      expect(received).toEqual([['经营制度.docx'], ['说明.md']])
+      expect(received).toEqual([])
       dispose()
     })
   })
@@ -295,21 +295,21 @@ describe('common attachment walking skeleton', () => {
     expect(items.map(item => item.kind === 'file' ? item.file.name : item.name)).toEqual([video.name, audio.name])
   })
 
-  it('serializes asynchronous drop intake and reports no concurrent item work', async () => {
+  it('serializes Web folder fallback intake', async () => {
     const documentTarget = new EventTarget()
     const windowTarget = new EventTarget()
     const starts: string[] = []
     let releaseFirst: (() => void) | undefined
     const firstGate = new Promise<void>(resolve => { releaseFirst = resolve })
     const dispose = bindFileIntake(documentTarget, windowTarget, async items => {
-      const name = (items[0] as Extract<IntakeItem, { readonly kind: 'file' }>).file.name
+      const name = (items[0] as Extract<IntakeItem, { readonly kind: 'folder' }>).name
       starts.push(`start:${name}`)
       if (name === 'first.md') await firstGate
       starts.push(`end:${name}`)
     }, () => {}, error => { throw error })
     const drop = (name: string): Event => {
       const value = new Event('drop', { cancelable: true })
-      Object.defineProperty(value, 'dataTransfer', { value: { types: ['Files'], files: [new File(['x'], name)], dropEffect: 'none' } })
+      Object.defineProperty(value, 'dataTransfer', { value: { types: ['Files'], files: [], items: [{ kind: 'file', webkitGetAsEntry: () => ({ isDirectory: true, name, createReader: () => ({ readEntries: (done: (entries: unknown[]) => void) => done([]) }) }) }], dropEffect: 'none' } })
       return value
     }
     documentTarget.dispatchEvent(drop('first.md'))

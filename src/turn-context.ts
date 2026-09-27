@@ -1,3 +1,5 @@
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
+declare module '@deepseek-ai/dsh-llm' { interface MessageSourceMap { 'plugin:dsh-dragndrop-attachments': { kind: 'plugin:dsh-dragndrop-attachments' } & ContextFormed } }
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent'
 import { boundContextSummary, createUserMessage, type UserMessage } from '@deepseek-ai/dsh-llm'
@@ -70,8 +72,7 @@ export function createAttachmentContextMessage(records: readonly AttachmentRecor
   return createUserMessage({
     content: [{ type: 'text', text: manifest(records, binding) }],
     source: {
-      kind: 'plugin',
-      plugin: PLUGIN_ID,
+      kind: 'plugin:dsh-dragndrop-attachments',
       form: 'notice',
       summary: summary(records),
     },

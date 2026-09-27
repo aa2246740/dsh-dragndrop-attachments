@@ -3,12 +3,8 @@ import type { DraftAttachmentId } from '@deepseek-ai/dsh-client-ui-conversation/
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { isPendingAttachment, type AttachmentRecord } from '../domain.js'
 import { collectPickedDirectory, collectWebkitDirectory, encodeFolderSnapshot, supportsModernDirectoryPicker, type IntakeItem } from './folders.js'
-import { isImageFile } from './image.js'
 import { bindFileIntake } from './transfers.js'
 import css from './AttachmentDock.module.css'
-
-const ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.markdown,.csv,.docx,.xlsx,.pptx,.zip,.json,.jsonl,.yaml,.yml,.toml,.xml,.tsv,.py,.js,.jsx,.ts,.tsx,.css,.html,.sh,.sql,.log'
-const SUPPORTED = /\.(png|jpe?g|webp|gif|txt|md|markdown|csv|docx|xlsx|pptx|zip|json|jsonl|ndjson|ya?ml|toml|xml|tsv|py|jsx?|tsx?|css|html?|sh|zsh|sql|log|ini|conf|env|properties|java|go|rs|c|h|cpp|hpp)$/iu
 
 interface UploadProgress { readonly id: number; readonly name: string; readonly percent: number; readonly phase: string }
 let nextUploadId = 0
@@ -24,7 +20,7 @@ export interface AttachmentDockInjected {
   readonly activateUploads: () => void
   readonly releaseUploads: () => Promise<void>
   readonly registerPicker: (picker: { readonly openFile: () => Promise<void>; readonly openFolder: () => Promise<void> }) => () => void
-  readonly attachNativeImages: (files: readonly File[], accept: (ids: readonly DraftAttachmentId[]) => boolean) => Promise<readonly { readonly name: string; readonly resized: boolean; readonly source: string; readonly output: string }[]>
+  readonly attachNativeFiles: (files: readonly File[], accept: (ids: readonly DraftAttachmentId[]) => boolean) => Promise<void>
 }
 export type AttachmentDockProps = PropsRuntime<'conversation.input.dock'> & AttachmentDockInjected
 
@@ -33,7 +29,6 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KiB`
   return `${Math.round(bytes / 1024 / 1024 * 10) / 10} MiB`
 }
-function supported(file: File): boolean { return isImageFile(file) || SUPPORTED.test(file.name) }
 function isPickerAbort(value: unknown): boolean { return value instanceof Error && value.name === 'AbortError' }
 function fileBadge(record: AttachmentRecord): string {
   if (record.kind === 'folder') return 'DIR'
@@ -41,7 +36,7 @@ function fileBadge(record: AttachmentRecord): string {
   return extension === undefined ? 'FILE' : extension.slice(0, 4)
 }
 
-export function AttachmentDock({ useConversation, useInput, inputActions, list, upload, removeDraft, commitReferences, activateUploads, releaseUploads, registerPicker, attachNativeImages }: AttachmentDockProps) {
+export function AttachmentDock({ useConversation, useInput, inputActions, list, upload, removeDraft, commitReferences, activateUploads, releaseUploads, registerPicker, attachNativeFiles }: AttachmentDockProps) {
   const phase = useInput(state => state.phase)
   const latestUserSeq = useConversation(snapshot => snapshot.views.get('chat')?.legacy.nodes.reduce(
     (latest, node) => node.kind === 'user' ? Math.max(latest, node.seq) : latest,
@@ -130,22 +125,18 @@ export function AttachmentDock({ useConversation, useInput, inputActions, list, 
   const handleItems = useCallback(async (items: readonly IntakeItem[]): Promise<void> => {
     setError(null); setNotice(null)
     const files = items.filter((item): item is Extract<IntakeItem, { readonly kind: 'file' }> => item.kind === 'file').map(item => item.file)
-    const rejected = files.filter(file => !supported(file))
-    if (rejected.length > 0) setError(`不支持：${rejected.map(file => file.name).join('、')}。支持图片、文本/Markdown、CSV、Office 和 ZIP。`)
-    const accepted = files.filter(supported)
-    const images = accepted.filter(isImageFile)
-    if (images.length > 0) {
-      try { await attachNativeImages(images, inputActions.addAttachments) } catch (value) { setError(value instanceof Error ? value.message : String(value)) }
-    }
-    for (const file of accepted.filter(file => !isImageFile(file))) await uploadOne({ kind: 'file', file })
+    if (files.length > 0) await attachNativeFiles(files, inputActions.addAttachments)
     for (const folder of items.filter((item): item is Extract<IntakeItem, { readonly kind: 'folder' }> => item.kind === 'folder')) {
       const encoded = await encodeFolderSnapshot(folder)
       if (encoded.emptyDirectories === 'unavailable') setNotice('当前文件夹选择器无法报告空目录；其余文件和路径已作为快照保存。')
       await uploadOne(encoded)
     }
-  }, [attachNativeImages, inputActions.addAttachments, uploadOne])
+  }, [attachNativeFiles, inputActions.addAttachments, uploadOne])
   handleItemsRef.current = handleItems
-  useEffect(() => bindFileIntake(document, window, handleItems, setDragActive, reportError), [handleItems, reportError])
+  useEffect(() => bindFileIntake(document, window, handleItems, setDragActive, reportError, {
+    desktop: '__DSH_HOST_PATHS__' in globalThis,
+    canAccept: () => phase !== 'adjudicating' && phase !== 'submitting',
+  }), [handleItems, reportError, phase])
 
   const detach = useCallback((record: AttachmentRecord): void => {
     setExpanded(current => current === record.attachmentId ? null : current)
@@ -153,7 +144,7 @@ export function AttachmentDock({ useConversation, useInput, inputActions, list, 
   }, [refresh, removeDraft])
   const visible = pending.length > 0 || uploads.length > 0 || notice !== null || error !== null
   return <>
-    <input ref={fileInputRef} className={css.hidden} type="file" multiple accept={ACCEPT} data-dsh-dragndrop-attachments="ready" onChange={event => { const files = [...(event.currentTarget.files ?? [])]; event.currentTarget.value = ''; void handleItems(files.map(file => ({ kind: 'file', file }))).catch(reportError) }} />
+    <input ref={fileInputRef} className={css.hidden} type="file" multiple data-dsh-dragndrop-attachments="ready" onChange={event => { const files = [...(event.currentTarget.files ?? [])]; event.currentTarget.value = ''; void handleItems(files.map(file => ({ kind: 'file', file }))).catch(reportError) }} />
     <input ref={folderInputRef} className={css.hidden} type="file" multiple onChange={event => { const files = [...(event.currentTarget.files ?? [])]; event.currentTarget.value = ''; void handleItems(collectWebkitDirectory(files)).catch(reportError) }} />
     {dragActive && <div className={css.overlay}><div className={css.overlayBox}>拖到这里，自动处理图片、文件和文件夹</div></div>}
     {visible && <div className={css.dock} data-dsh-dragndrop-attachment-dock="ready"><div className={css.rail}>

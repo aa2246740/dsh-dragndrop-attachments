@@ -1,6 +1,6 @@
 # DSH Drag & Drop Attachments
 
-为官方 **DeepSeek Harness 0.1.7-rc.2** 增强文档读取。照常拖文件、粘贴或使用原生附件按钮；图片、文本和 PDF 沿用原生处理，DOCX、XLSX、PPTX、CSV 和 ZIP 自动接入本地解析。无需选择“增强导入”，不修改官方源码。
+为官方 **DeepSeek Harness 0.2.0-rc.2** 增强文档读取。照常拖文件、粘贴或使用原生附件按钮；图片、文本和 PDF 沿用原生处理，DOCX、XLSX、PPTX、CSV 和 ZIP 自动接入本地解析。无需选择“增强导入”，不修改官方源码。
 
 ## 安装
 
@@ -10,7 +10,7 @@
 dsh plugin --profile web add github:aa2246740/dsh-dragndrop-attachments
 ```
 
-需要官方 `dsh`（也可用 `npx @deepseek-ai/dsh@0.1.7-rc.2`）和 PATH 中的 **pnpm**。等当前任务完成后重启这个 Host，再刷新页面。仓库 main 已包含构建好的 `lib/`，安装不需要编译插件或额外开发工具。
+需要官方 `dsh`（也可用 `npx @deepseek-ai/dsh@0.2.0-rc.2`）和 PATH 中的 **pnpm**。等当前任务完成后重启这个 Host，再刷新页面。仓库 main 已包含构建好的 `lib/`，安装不需要编译插件或额外开发工具。
 
 ### 官方桌面端 / DSH Studio
 
